@@ -1,0 +1,59 @@
+# ====== Settings ======
+VENV?=.venv
+PY?=python
+PIP?=pip
+CONFIG?=configs/pretrain.yaml
+
+.PHONY: help venv install install-colab format lint train train-data train-colab train-data-colab test clean
+
+help:
+	@echo "Common commands:"
+	@echo "  make venv                 # create local virtualenv"
+	@echo "  make install              # install deps into venv"
+	@echo "  make install-colab        # install deps in current environment (Colab)"
+	@echo "  make train                # run smoke pretrain with $(CONFIG) (uses venv)"
+	@echo "  make train-data DATA=...  # same but override dataset path"
+	@echo "  make train-colab          # run pretrain in current env (Colab)"
+	@echo "  make train-data-colab DATA=...   # pretrain w/ explicit data path (Colab)"
+	@echo "  make test                 # quick import test"
+	@echo "  make clean                # remove caches / outputs"
+
+# ====== Local dev (venv) ======
+venv:
+	$(PY) -m venv $(VENV)
+	. $(VENV)/bin/activate; $(PIP) install --upgrade pip
+
+install:
+	. $(VENV)/bin/activate; $(PIP) install --no-cache-dir -r requirements.txt
+
+format:
+	@[ -f $(VENV)/bin/black ] && . $(VENV)/bin/activate && black src || echo "black not installed (optional)"
+
+lint:
+	@[ -f $(VENV)/bin/ruff ] && . $(VENV)/bin/activate && ruff check src || echo "ruff not installed (optional)"
+
+train:
+	. $(VENV)/bin/activate; $(PY) -m src.businessbert2.training.pretrain --config $(CONFIG)
+
+train-data:
+	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data DATA=/path/to/file.jsonl"; exit 1; fi
+	. $(VENV)/bin/activate; $(PY) -m src.businessbert2.training.pretrain --config $(CONFIG) --data $(DATA)
+
+test:
+	. $(VENV)/bin/activate; $(PY) -c "import transformers, torch; print('OK', transformers.__version__)"
+
+# ====== Colab / any pre-provisioned env (no venv) ======
+install-colab:
+	$(PIP) -q install --no-cache-dir -r requirements.txt
+
+train-colab:
+	$(PY) -m src.businessbert2.training.pretrain --config $(CONFIG)
+
+train-data-colab:
+	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/.../sample.jsonl"; exit 1; fi
+	$(PY) -m src.businessbert2.training.pretrain --config $(CONFIG) --data $(DATA)
+
+# ====== Cleanup ======
+clean:
+	rm -rf __pycache__ .pytest_cache */__pycache__ *.egg-info
+	rm -rf outputs checkpoints

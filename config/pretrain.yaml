@@ -1,0 +1,12 @@
+seed: 42
+model_name: bert-base-uncased
+max_seq_len: 128
+batch_size: 8
+learning_rate: 5.0e-5
+num_steps: 20
+log_every: 5
+
+jsonl_path: ./data/sample.jsonl
+text_field: sentences
+
+save_dir: ./outputs/test_run
