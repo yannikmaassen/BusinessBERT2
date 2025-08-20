@@ -1,12 +1,27 @@
 seed: 42
 model_name: bert-base-uncased
-max_seq_len: 128
-batch_size: 8
-learning_rate: 5.0e-5
-num_steps: 20
-log_every: 5
+max_seq_len: 512
+train_batch_size: 32
+eval_batch_size: 32
+learning_rate: 5e-5
+adam_epsilon: 1e-8
+num_train_epochs: 3
+num_warmup_steps: 100
+num_training_steps: 1000
+num_workers: 4
+weight_decay: 0.01
+gradient_accumulation_steps: 1
+fp16: true
+logging_steps: 50
+save_total_limit: 2
+save_strategy: steps
+save_steps: 500
+evaluation_strategy: steps
+evaluation_steps: 500
+
+report_to: wandb
+disable_tqdm: false
 
 jsonl_path: ./data/sample.jsonl
 text_field: sentences
-
-save_dir: ./outputs/test_run
+output_dir: ./outputs/pretrain
