@@ -51,7 +51,7 @@ train-colab:
 
 train-data-colab:
 	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/.../sample.jsonl"; exit 1; fi
-	$(PY) -m src.businessbert2.training.pretrain --config $(CONFIG) --data $(DATA)
+	$(PY) -m src.training.pretrain --config $(CONFIG) --data $(DATA)
 
 # ====== Cleanup ======
 clean:
