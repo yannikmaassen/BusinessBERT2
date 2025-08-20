@@ -4,7 +4,7 @@ PY?=python
 PIP?=pip
 CONFIG?=config/pretrain.yaml
 
-.PHONY: help venv install install-colab format lint train train-data train-colab train-data-colab test clean
+.PHONY: help venv install install-colab train train-data train-colab train-data-colab test clean
 
 help:
 	@echo "Common commands:"
@@ -26,12 +26,6 @@ venv:
 install:
 	. $(VENV)/bin/activate; $(PIP) install --no-cache-dir -r requirements.txt
 
-format:
-	@[ -f $(VENV)/bin/black ] && . $(VENV)/bin/activate && black src || echo "black not installed (optional)"
-
-lint:
-	@[ -f $(VENV)/bin/ruff ] && . $(VENV)/bin/activate && ruff check src || echo "ruff not installed (optional)"
-
 train:
 	. $(VENV)/bin/activate; $(PY) -m src.businessbert2.training.pretrain --config $(CONFIG)
 
@@ -47,7 +41,7 @@ install-colab:
 	$(PIP) -q install --no-cache-dir -r requirements.txt
 
 train-colab:
-	$(PY) -m src.businessbert2.training.pretrain --config $(CONFIG)
+	$(PY) -m src.training.pretrain --config $(CONFIG)
 
 train-data-colab:
 	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/businessbert_data/sample.jsonl"; exit 1; fi
