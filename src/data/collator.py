@@ -7,13 +7,13 @@ from transformers import PreTrainedTokenizerBase
 @dataclass
 class Collator:
     tokenizer: PreTrainedTokenizerBase
-    mlm_prob: float
-    rand_prob: float
-    keep_prob: float
+    mlm_probability: float
+    rand_probability: float
+    keep_probability: float
 
     def mask_tokens(self, input_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         labels = input_ids.clone()
-        probability_matrix = torch.full(labels.shape, self.mlm_prob, device=labels.device)
+        probability_matrix = torch.full(labels.shape, self.mlm_probability, device=labels.device)
         special_tokens_mask = [
             self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True)
             for val in labels.tolist()
@@ -26,7 +26,7 @@ class Collator:
         # 80% -> [MASK]
         indices_replaced = (
             torch.bernoulli(
-                torch.full(labels.shape, 1 - self.rand_prob - self.keep_prob, device=labels.device)
+                torch.full(labels.shape, 1 - self.rand_probability - self.keep_probability, device=labels.device)
             ).bool() & masked_indices
         )
         input_ids[indices_replaced] = self.tokenizer.convert_tokens_to_ids(self.tokenizer.mask_token)
@@ -34,12 +34,14 @@ class Collator:
         # 10% -> random
         indices_random = (
             torch.bernoulli(
-                torch.full(labels.shape, self.rand_prob / (self.rand_prob + self.keep_prob + 1e-8), device=labels.device)
+                torch.full(labels.shape, self.rand_probability / (self.rand_probability + self.keep_probability + 1e-8), device=labels.device)
             ).bool() & masked_indices & ~indices_replaced
         )
         random_words = torch.randint(len(self.tokenizer), labels.shape, dtype=torch.long, device=labels.device)
         input_ids[indices_random] = random_words[indices_random]
+
         return input_ids, labels
+
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         batch_input_ids = [torch.tensor(f["input_ids"], dtype=torch.long) for f in features]
