@@ -1,5 +1,7 @@
+# Pretraining configuration
 seed: 42
 model_name: bert-base-uncased
+base_tokenizer: bert-base-uncased
 max_seq_len: 512
 train_batch_size: 32
 eval_batch_size: 32
@@ -11,6 +13,7 @@ num_training_steps: 1000
 num_workers: 4
 weight_decay: 0.01
 gradient_accumulation_steps: 1
+grad_clip: 1.0
 fp16: true
 logging_steps: 50
 save_total_limit: 2
@@ -18,10 +21,33 @@ save_strategy: steps
 save_steps: 500
 evaluation_strategy: steps
 evaluation_steps: 500
+val_ratio: 0.05
 
+# Progress
 report_to: wandb
 disable_tqdm: false
 
-jsonl_path: ./data/sample.jsonl
-text_field: sentences
+# Data
+jsonl_path: "${data}"
+field_text: sentences
+field_sic2: sic2
+field_sic3: sic3
+field_sic4: sic4
+
+# Saving
 output_dir: ./outputs/pretrain
+safe_serialization: false
+
+# MLM params
+mlm_probability: 0.15
+random_token_probability: 0.10
+keep_token_probability: 0.10
+
+# Loss weights
+loss_weights:
+  mlm: 1.0
+  sop: 1.0
+  ic2: 1.0
+  ic3: 0.6
+  ic4: 0.3
+  consistency: 0.1

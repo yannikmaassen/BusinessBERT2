@@ -4,7 +4,7 @@ PY?=python
 PIP?=pip
 CONFIG?=config/pretrain.yaml
 
-.PHONY: help venv install install-colab train train-data train-colab train-data-colab test clean
+.PHONY: help venv install install-colab train train-data train-colab train-data-colab test clean pretrain
 
 help:
 	@echo "Common commands:"
@@ -27,11 +27,11 @@ install:
 	. $(VENV)/bin/activate; $(PIP) install --no-cache-dir -r requirements.txt
 
 train:
-	. $(VENV)/bin/activate; $(PY) -m src.businessbert2.training.pretrain --config $(CONFIG)
+	. $(VENV)/bin/activate; $(PY) -m src.training.pretrain --config $(CONFIG)
 
 train-data:
 	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data DATA=/path/to/file.jsonl"; exit 1; fi
-	. $(VENV)/bin/activate; $(PY) -m src.businessbert2.training.pretrain --config $(CONFIG) --data $(DATA)
+	. $(VENV)/bin/activate; $(PY) -m src.training.pretrain --config $(CONFIG) --data $(DATA)
 
 test:
 	. $(VENV)/bin/activate; $(PY) -c "import transformers, torch; print('OK', transformers.__version__)"
@@ -51,3 +51,6 @@ train-data-colab:
 clean:
 	rm -rf __pycache__ .pytest_cache */__pycache__ *.egg-info
 	rm -rf outputs checkpoints
+
+pretrain:
+	python -m src.training.pretrain --config config/pretrain.yaml --data ./data/sample.jsonl
