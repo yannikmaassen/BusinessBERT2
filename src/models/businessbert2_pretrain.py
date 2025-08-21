@@ -55,6 +55,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
         self.init_weights()
 
+
     def forward(
         self,
         input_ids,
