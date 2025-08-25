@@ -22,7 +22,7 @@ from .engine import run_eval
 
 def set_seed(seed: int):
     random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
+    # os.environ["PYTHONHASHSEED"] = str(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
@@ -36,14 +36,17 @@ def load_config(path: str, data_override: str = None) -> Dict:
 
 
 def main():
+    # Parse cli args
     parser = argparse.ArgumentParser(description="BusinessBERT 2.0 – Pretraining")
     parser.add_argument("--config", required=True, help="Path to YAML config")
     parser.add_argument("--data", required=False, help="Optional: override jsonl path")
     args = parser.parse_args()
 
+    # Load config from config/pretrain.yaml and set up
     config = load_config(args.config, args.data)
     os.makedirs(config["save_dir"], exist_ok=True)
 
+    # Set random seed
     set_seed(int(config.get("seed", 42)))
 
     # ---------------- Data ----------------
@@ -52,6 +55,7 @@ def main():
 
     random.shuffle(dataset)
 
+    # IC specific – build taxonomy maps
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
     print(
         f"SIC sizes: "
@@ -60,26 +64,31 @@ def main():
         f"4-digit={len(taxonomy_maps['sic4_list'])}"
     )
 
+    # Split train/val
     n_total = len(dataset)
     n_val = max(1, int(n_total * config["val_ratio"]))
     val_rows = dataset[:n_val]
     train_rows = dataset[n_val:]
 
+    # Create examples (sentence pairs with SOP labels and SIC labels)
     train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
     val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
 
+    # Set up tokenizer
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
 
+    # Create train and val datasets
     train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
+    # Create data loaders
     collate = Collator(
         tokenizer=tokenizer,
-        mlm_prob=config["mlm_probability"],
-        rand_prob=config["random_token_probability"],
-        keep_prob=config["keep_token_probability"],
+        mlm_probability=config["mlm_probability"],
+        rand_probability=config["random_token_probability"],
+        keep_probability=config["keep_token_probability"],
     )
 
     train_loader = DataLoader(
@@ -103,9 +112,9 @@ def main():
     # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    config = BertConfig.from_pretrained(config["base_tokenizer"])
+    bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
     model = BusinessBERT2Pretrain(
-        config=config,
+        config=bert_config,
         n_sic2=len(taxonomy_maps["sic2_list"]),
         n_sic3=len(taxonomy_maps["sic3_list"]),
         n_sic4=len(taxonomy_maps["sic4_list"]),

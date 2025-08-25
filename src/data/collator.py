@@ -6,12 +6,14 @@ from transformers import PreTrainedTokenizerBase
 
 @dataclass
 class Collator:
+    # TODO: check for correct tokenizer type
     tokenizer: PreTrainedTokenizerBase
     mlm_probability: float
     rand_probability: float
     keep_probability: float
 
     def mask_tokens(self, input_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        # Prepare masked tokens inputs/labels for masked language modeling: 80% MASK, 10% random, 10% original.
         labels = input_ids.clone()
         probability_matrix = torch.full(labels.shape, self.mlm_probability, device=labels.device)
         special_tokens_mask = [
@@ -44,6 +46,7 @@ class Collator:
 
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        # Convert lists to tensors
         batch_input_ids = [torch.tensor(f["input_ids"], dtype=torch.long) for f in features]
         batch_token_type = [torch.tensor(f["token_type_ids"], dtype=torch.long) for f in features]
         batch_attention = [torch.tensor(f["attention_mask"], dtype=torch.long) for f in features]
@@ -52,11 +55,13 @@ class Collator:
         sic3 = torch.tensor([f["sic3"] for f in features], dtype=torch.long)
         sic4 = torch.tensor([f["sic4"] for f in features], dtype=torch.long)
 
+        # Pad sequences
         input_ids = torch.nn.utils.rnn.pad_sequence(batch_input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id)
         token_type_ids = torch.nn.utils.rnn.pad_sequence(batch_token_type, batch_first=True, padding_value=0)
         attention_mask = torch.nn.utils.rnn.pad_sequence(batch_attention, batch_first=True, padding_value=0)
         input_ids, mlm_labels = self.mask_tokens(input_ids)
 
+        # Return batch
         return {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
