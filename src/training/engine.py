@@ -1,7 +1,7 @@
 import collections
 from typing import Dict
 import torch
-from .metrics import mlm_accuracy, top1_accuracy, binary_accuracy
+from src.training.metrics import mlm_accuracy, top1_accuracy, binary_accuracy
 
 
 @torch.no_grad()

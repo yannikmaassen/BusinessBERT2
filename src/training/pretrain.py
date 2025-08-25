@@ -13,11 +13,12 @@ import yaml
 
 from transformers import AutoTokenizer, BertConfig
 
-from ..utils.file_manager import read_jsonl
-from ..utils.taxonomy import build_taxonomy_maps
-from ..data import make_examples, PretrainDataset, Collator
-from ..models import BusinessBERT2Pretrain
-from .engine import run_eval
+from src.utils.file_manager import read_jsonl
+from src.utils.taxonomy import build_taxonomy_maps
+from src.data import make_examples, PretrainDataset, Collator
+from src.models import BusinessBERT2Pretrain
+from src.training.engine import run_eval
+from src.training.metrics import mlm_accuracy, binary_accuracy, top1_accuracy
 
 
 def set_seed(seed: int):
@@ -36,11 +37,20 @@ def load_config(path: str, data_override: str = None) -> Dict:
 
 
 def main():
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
     # Parse cli args
     parser = argparse.ArgumentParser(description="BusinessBERT 2.0 – Pretraining")
-    parser.add_argument("--config", required=True, help="Path to YAML config")
+    parser.add_argument("--config", required=False, help="Path to YAML config")
     parser.add_argument("--data", required=False, help="Optional: override jsonl path")
     args = parser.parse_args()
+
+    if args.config is None:
+        args.config = os.path.join(os.path.dirname(__file__), "..", "..", "config", "pretrain.yaml")
+        print(f"No config path specified, using default: {args.config}")
+
+    if args.data is None:
+        args.data = os.path.join(os.path.dirname(__file__), "..", "..", "data", "sample.jsonl")
+        print(f"No data path specified, using default: {args.data}")
 
     # Load config from config/pretrain.yaml and set up
     config = load_config(args.config, args.data)
@@ -128,10 +138,10 @@ def main():
     scaler = torch.cuda.amp.GradScaler(enabled=torch.cuda.is_available())
 
     # -------- Training loop --------
-    total_train_steps = config["epochs"] * max(1, len(train_loader))
+    total_train_steps = config["num_train_epochs"] * max(1, len(train_loader))
     global_step = 0
 
-    for epoch in range(1, config["epochs"] + 1):
+    for epoch in range(1, config["num_train_epochs"] + 1):
         model.train()
         running = collections.defaultdict(float)
         counts = collections.defaultdict(int)
@@ -161,7 +171,6 @@ def main():
                 running[f"loss_{k}"] += float(v.item())
                 counts[f"loss_{k}"] += 1
 
-            from .metrics import mlm_accuracy, binary_accuracy, top1_accuracy
             correct, total = mlm_accuracy(out["mlm_logits"], batch["mlm_labels"])
             running["acc_mlm_correct"] += correct; running["acc_mlm_total"] += total
 
@@ -180,7 +189,7 @@ def main():
 
             global_step += 1
 
-            if step % max(1, config["log_every"] // 5) == 0 or step == 1:
+            if step % max(1, config["logging_steps"] // 5) == 0 or step == 1:
                 progress_bar.set_postfix({
                     "loss_mlm": f"{(running['loss_mlm']/max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm',0) else "-",
                     "loss_sop": f"{(running['loss_sop']/max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop',0) else "-",
@@ -189,7 +198,7 @@ def main():
                     "acc_sop": f"{(running['acc_sop_correct']/max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total',0) else "-",
                 })
 
-            if global_step % config["log_every"] == 0:
+            if global_step % config["logging_steps"] == 0:
                 msg = [f"epoch {epoch} step {global_step}"]
                 for key in ["mlm", "sop", "ic2", "ic3", "ic4", "consistency"]:
                     loss_key = f"loss_{key}"

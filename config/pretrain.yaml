@@ -5,9 +5,9 @@ base_tokenizer: bert-base-uncased
 max_seq_len: 512
 train_batch_size: 32
 val_batch_size: 32
-learning_rate: 5e-5
-adam_epsilon: 1e-8
-num_train_epochs: 3
+learning_rate: !!float 5e-5
+adam_epsilon: !!float 1e-8
+num_train_epochs: 1
 num_warmup_steps: 100
 num_training_steps: 1000
 num_workers: 4
@@ -35,7 +35,7 @@ field_sic3: sic3
 field_sic4: sic4
 
 # Saving
-output_dir: ./outputs/pretrain
+save_dir: ./outputs/pretrain
 safe_serialization: false
 
 # MLM params

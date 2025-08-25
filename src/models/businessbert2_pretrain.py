@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import BertConfig, BertModel, BertPreTrainedModel
-from .heads import BertPretrainHeads
+from src.models.heads import BertPretrainHeads
 
 
 def _kl_div(p_log, q, eps: float = 1e-8):
