@@ -2,6 +2,7 @@ from typing import Dict, List
 import torch
 
 
+# TODO: IC
 def _row_normalize(m: torch.Tensor) -> torch.Tensor:
     if m.numel() == 0:
         return m

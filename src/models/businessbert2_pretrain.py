@@ -15,6 +15,7 @@ def _js_div(p, q, eps: float = 1e-8):
     return 0.5 * _kl_div(p.log(), m, eps) + 0.5 * _kl_div(q.log(), m, eps)
 
 
+# TODO: IC
 class BusinessBERT2Pretrain(BertPreTrainedModel):
     """
     BERT encoder with:

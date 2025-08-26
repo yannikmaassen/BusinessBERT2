@@ -44,7 +44,7 @@ class Collator:
 
         return input_ids, labels
 
-
+    # TODO: IC
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         # Convert lists to tensors
         batch_input_ids = [torch.tensor(f["input_ids"], dtype=torch.long) for f in features]

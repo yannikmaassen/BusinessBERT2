@@ -2,6 +2,7 @@ from typing import List
 import random
 
 
+# TODO: IC
 class PretrainExample:
     def __init__(self, sentence_a, sentence_b, sop_label, sic2, sic3, sic4):
         self.sentence_a = sentence_a

@@ -50,7 +50,7 @@ def main():
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
 
-    # IC specific – build taxonomy maps
+    # TODO: IC
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
     print(
         f"SIC sizes: "
@@ -108,7 +108,7 @@ def main():
 
     # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    # TODO: IC
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
     model = BusinessBERT2Pretrain(
         config=bert_config,
@@ -141,11 +141,10 @@ def main():
                 out = model(**batch)
                 loss = out["loss"]
 
-            # TODO: Warm up consistency weight linearly over first 30% of total steps
+            # TODO: IC
             progress = min(1.0, global_step / max(1, int(0.3 * total_train_steps)))
             model.loss_weights["consistency"] = float(config["loss_weights"].get("consistency", 0.1)) * progress
 
-            # TODO
             scaler.scale(loss).backward()
             if config.get("grad_clip", 0):
                 scaler.unscale_(optimizer)
@@ -164,6 +163,7 @@ def main():
             correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
             running["acc_sop_correct"] += correct; running["acc_sop_total"] += total
 
+            # TODO: IC
             if out["ic2_logits"] is not None:
                 c, t = top1_accuracy(out["ic2_logits"], batch["sic2"])
                 running["acc_ic2_correct"] += c; running["acc_ic2_total"] += t
@@ -176,6 +176,7 @@ def main():
 
             global_step += 1
 
+            # TODO: IC
             if step % max(1, config["logging_steps"] // 5) == 0 or step == 1:
                 progress_bar.set_postfix({
                     "loss_mlm": f"{(running['loss_mlm']/max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm',0) else "-",
@@ -185,6 +186,7 @@ def main():
                     "acc_sop": f"{(running['acc_sop_correct']/max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total',0) else "-",
                 })
 
+            # TODO: IC
             if global_step % config["logging_steps"] == 0:
                 msg = [f"epoch {epoch} step {global_step}"]
                 for key in ["mlm", "sop", "ic2", "ic3", "ic4", "consistency"]:
