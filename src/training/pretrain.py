@@ -5,6 +5,7 @@ import random
 import time
 from typing import Dict
 
+from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -19,11 +20,11 @@ from src.data import make_examples, PretrainDataset, Collator
 from src.models import BusinessBERT2Pretrain
 from src.training.engine import run_eval
 from src.training.metrics import mlm_accuracy, binary_accuracy, top1_accuracy
+from src.utils.arg_parser import parse_cli_args
 
 
 def set_seed(seed: int):
     random.seed(seed)
-    # os.environ["PYTHONHASHSEED"] = str(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
@@ -38,32 +39,16 @@ def load_config(path: str, data_override: str = None) -> Dict:
 
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    # Parse cli args
-    parser = argparse.ArgumentParser(description="BusinessBERT 2.0 – Pretraining")
-    parser.add_argument("--config", required=False, help="Path to YAML config")
-    parser.add_argument("--data", required=False, help="Optional: override jsonl path")
-    args = parser.parse_args()
+    args = parse_cli_args()
 
-    if args.config is None:
-        args.config = os.path.join(os.path.dirname(__file__), "..", "..", "config", "pretrain.yaml")
-        print(f"No config path specified, using default: {args.config}")
-
-    if args.data is None:
-        args.data = os.path.join(os.path.dirname(__file__), "..", "..", "data", "sample.jsonl")
-        print(f"No data path specified, using default: {args.data}")
-
-    # Load config from config/pretrain.yaml and set up
     config = load_config(args.config, args.data)
     os.makedirs(config["save_dir"], exist_ok=True)
 
-    # Set random seed
     set_seed(int(config.get("seed", 42)))
 
     # ---------------- Data ----------------
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
-
-    random.shuffle(dataset)
 
     # IC specific – build taxonomy maps
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
@@ -75,10 +60,12 @@ def main():
     )
 
     # Split train/val
-    n_total = len(dataset)
-    n_val = max(1, int(n_total * config["val_ratio"]))
-    val_rows = dataset[:n_val]
-    train_rows = dataset[n_val:]
+    train_rows, val_rows = train_test_split(
+        dataset,
+        test_size=config["val_ratio"],
+        shuffle=True,
+        random_state=config.get("seed", 42),
+    )
 
     # Create examples (sentence pairs with SOP labels and SIC labels)
     train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
