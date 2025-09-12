@@ -1,8 +1,9 @@
 import collections
+import math
 import os
 import random
 import time
-from typing import Dict
+from typing import Dict, Tuple
 
 from sklearn.model_selection import train_test_split
 import torch
@@ -14,12 +15,12 @@ import yaml
 from transformers import AutoTokenizer, BertConfig
 
 from src.utils.file_manager import read_jsonl
-from src.utils.taxonomy import build_taxonomy_maps
 from src.data import make_examples, PretrainDataset, Collator
 from src.models import BusinessBERT2Pretrain
 from src.training.engine import run_eval
 from src.training.metrics import mlm_accuracy, binary_accuracy, top1_accuracy
 from src.utils.arg_parser import parse_cli_args
+from src.utils.taxonomy import build_taxonomy_maps
 
 
 def set_seed(seed: int):
@@ -36,6 +37,26 @@ def load_config(path: str, data_override: str = None) -> Dict:
     return config
 
 
+def coarse_to_fine_weights(training_step_index: int, total_training_steps: int) -> Tuple[float, float, float]:
+    """
+    Smooth schedule:
+      Early: emphasize SIC2
+      Middle: increase SIC3
+      Late: emphasize SIC4
+    Returns weights (weight_sic2, weight_sic3, weight_sic4) that sum to 1.0.
+    """
+    training_progress = min(max(training_step_index / max(1, total_training_steps), 0.0), 1.0)
+    cosine_ramp = 0.5 - 0.5 * math.cos(math.pi * training_progress)  # 0 -> 1
+
+    weight_sic2 = 0.8 * (1 - cosine_ramp) + 0.2   # 1.0 -> 0.2
+    weight_sic3 = 0.3 + 0.4 * cosine_ramp         # 0.3 -> 0.7
+    weight_sic4 = 0.1 + 0.9 * cosine_ramp         # 0.1 -> 1.0
+
+    weight_sum = weight_sic2 + weight_sic3 + weight_sic4
+
+    return weight_sic2 / weight_sum, weight_sic3 / weight_sum, weight_sic4 / weight_sum
+
+
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
@@ -49,7 +70,6 @@ def main():
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
 
-    # TODO: IC
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
     print(
         f"SIC sizes: "
@@ -107,13 +127,13 @@ def main():
 
     # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # TODO: IC
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
+
     model = BusinessBERT2Pretrain(
         config=bert_config,
-        n_sic2=len(taxonomy_maps["sic2_list"]),
-        n_sic3=len(taxonomy_maps["sic3_list"]),
-        n_sic4=len(taxonomy_maps["sic4_list"]),
+        n_sic2_classes=len(taxonomy_maps["sic2_list"]),
+        n_sic3_classes=len(taxonomy_maps["sic3_list"]),
+        n_sic4_classes=len(taxonomy_maps["sic4_list"]),
         A32=taxonomy_maps["A32"].to(device) if len(taxonomy_maps["sic3_list"]) and len(taxonomy_maps["sic2_list"]) else torch.empty(0),
         A43=taxonomy_maps["A43"].to(device) if len(taxonomy_maps["sic4_list"]) and len(taxonomy_maps["sic3_list"]) else torch.empty(0),
         loss_weights=config["loss_weights"],
@@ -135,14 +155,24 @@ def main():
 
         progress_bar = tqdm(total=len(train_loader), desc=f"Epoch {epoch}", leave=True)
         for step, batch in enumerate(train_loader, start=1):
+            # ----- NEW: set hierarchical weights (coarse->fine) every step -----
+            w2, w3, w4 = coarse_to_fine_weights(global_step, total_train_steps)
+            base_w2 = float(config["loss_weights"].get("ic2", 1.0))
+            base_w3 = float(config["loss_weights"].get("ic3", 1.0))
+            base_w4 = float(config["loss_weights"].get("ic4", 1.0))
+            model.loss_weights["ic2"] = base_w2 * w2
+            model.loss_weights["ic3"] = base_w3 * w3
+            model.loss_weights["ic4"] = base_w4 * w4
+
+            # keep consistency gentle early on (ramp up over first ~30%)
+            progress = min(1.0, global_step / max(1, int(0.3 * total_train_steps)))
+            model.loss_weights["consistency"] = float(config["loss_weights"].get("consistency", 0.2)) * progress
+            # -------------------------------------------------------------------
+
             batch = {k: v.to(device) for k, v in batch.items()}
             with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
                 out = model(**batch)
                 loss = out["loss"]
-
-            # TODO: IC
-            progress = min(1.0, global_step / max(1, int(0.3 * total_train_steps)))
-            model.loss_weights["consistency"] = float(config["loss_weights"].get("consistency", 0.1)) * progress
 
             scaler.scale(loss).backward()
             if config.get("grad_clip", 0):
@@ -157,58 +187,73 @@ def main():
                 counts[f"loss_{k}"] += 1
 
             correct, total = mlm_accuracy(out["mlm_logits"], batch["mlm_labels"])
-            running["acc_mlm_correct"] += correct; running["acc_mlm_total"] += total
+            running["acc_mlm_correct"] += correct;
+            running["acc_mlm_total"] += total
 
             correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
-            running["acc_sop_correct"] += correct; running["acc_sop_total"] += total
+            running["acc_sop_correct"] += correct;
+            running["acc_sop_total"] += total
 
-            # TODO: IC
             if out["ic2_logits"] is not None:
                 c, t = top1_accuracy(out["ic2_logits"], batch["sic2"])
-                running["acc_ic2_correct"] += c; running["acc_ic2_total"] += t
+                running["acc_ic2_correct"] += c;
+                running["acc_ic2_total"] += t
             if out["ic3_logits"] is not None:
                 c, t = top1_accuracy(out["ic3_logits"], batch["sic3"])
-                running["acc_ic3_correct"] += c; running["acc_ic3_total"] += t
+                running["acc_ic3_correct"] += c;
+                running["acc_ic3_total"] += t
             if out["ic4_logits"] is not None:
                 c, t = top1_accuracy(out["ic4_logits"], batch["sic4"])
-                running["acc_ic4_correct"] += c; running["acc_ic4_total"] += t
+                running["acc_ic4_correct"] += c;
+                running["acc_ic4_total"] += t
 
             global_step += 1
 
-            # TODO: IC
             if step % max(1, config["logging_steps"] // 5) == 0 or step == 1:
                 progress_bar.set_postfix({
-                    "loss_mlm": f"{(running['loss_mlm']/max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm',0) else "-",
-                    "loss_sop": f"{(running['loss_sop']/max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop',0) else "-",
-                    "loss_ic4": f"{(running['loss_ic4']/max(1, counts['loss_ic4'])):.3f}" if counts.get('loss_ic4',0) else "-",
-                    "cons": f"{(running['loss_consistency']/max(1, counts['loss_consistency'])):.3f}" if counts.get('loss_consistency',0) else "-",
-                    "acc_sop": f"{(running['acc_sop_correct']/max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total',0) else "-",
+                    "loss_mlm": f"{(running['loss_mlm'] / max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm',
+                                                                                                          0) else "-",
+                    "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop',
+                                                                                                          0) else "-",
+                    # ----- NEW: show all IC losses -----
+                    "loss_ic2": f"{(running['loss_ic2'] / max(1, counts['loss_ic2'])):.3f}" if counts.get('loss_ic2',
+                                                                                                          0) else "-",
+                    "loss_ic3": f"{(running['loss_ic3'] / max(1, counts['loss_ic3'])):.3f}" if counts.get('loss_ic3',
+                                                                                                          0) else "-",
+                    "loss_ic4": f"{(running['loss_ic4'] / max(1, counts['loss_ic4'])):.3f}" if counts.get('loss_ic4',
+                                                                                                          0) else "-",
+                    "cons": f"{(running['loss_consistency'] / max(1, counts['loss_consistency'])):.3f}" if counts.get(
+                        'loss_consistency', 0) else "-",
+                    "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get(
+                        'acc_sop_total', 0) else "-",
                 })
 
-            # TODO: IC
             if global_step % config["logging_steps"] == 0:
                 msg = [f"epoch {epoch} step {global_step}"]
                 for key in ["mlm", "sop", "ic2", "ic3", "ic4", "consistency"]:
                     loss_key = f"loss_{key}"
                     if counts.get(loss_key, 0):
-                        msg.append(f"{loss_key}:{running[loss_key]/counts[loss_key]:.4f}")
+                        msg.append(f"{loss_key}:{running[loss_key] / counts[loss_key]:.4f}")
                 if running.get("acc_mlm_total", 0) > 0:
-                    msg.append(f"acc_mlm:{running['acc_mlm_correct']/max(1, running['acc_mlm_total']):.4f}")
+                    msg.append(f"acc_mlm:{running['acc_mlm_correct'] / max(1, running['acc_mlm_total']):.4f}")
                 if running.get("acc_sop_total", 0) > 0:
-                    msg.append(f"acc_sop:{running['acc_sop_correct']/max(1, running['acc_sop_total']):.4f}")
+                    msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
                 if running.get("acc_ic2_total", 0) > 0:
-                    msg.append(f"acc_ic2:{running['acc_ic2_correct']/running['acc_ic2_total']:.4f}")
+                    msg.append(f"acc_ic2:{running['acc_ic2_correct'] / running['acc_ic2_total']:.4f}")
                 if running.get("acc_ic3_total", 0) > 0:
-                    msg.append(f"acc_ic3:{running['acc_ic3_correct']/running['acc_ic3_total']:.4f}")
+                    msg.append(f"acc_ic3:{running['acc_ic3_correct'] / running['acc_ic3_total']:.4f}")
                 if running.get("acc_ic4_total", 0) > 0:
-                    msg.append(f"acc_ic4:{running['acc_ic4_correct']/running['acc_ic4_total']:.4f}")
+                    msg.append(f"acc_ic4:{running['acc_ic4_correct'] / running['acc_ic4_total']:.4f}")
+                # (Optional) also print current dynamic weights:
+                msg.append(
+                    f"w2:{model.loss_weights['ic2']:.3f} w3:{model.loss_weights['ic3']:.3f} w4:{model.loss_weights['ic4']:.3f} wC:{model.loss_weights['consistency']:.3f}")
                 print(" | ".join(msg))
 
             progress_bar.update(1)
 
         progress_bar.close()
         dt = time.time() - t0
-        print(f"Epoch {epoch} finished in {dt/60:.1f} min")
+        print(f"Epoch {epoch} finished in {dt / 60:.1f} min")
         run_eval(model, device, val_loader, desc=f"VAL epoch {epoch}")
 
     # ---------------- Save ----------------
