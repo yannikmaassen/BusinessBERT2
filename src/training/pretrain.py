@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import yaml
 
-from transformers import AutoTokenizer, BertConfig
+from transformers import AutoTokenizer, BertConfig, get_scheduler
 
 from src.utils.file_manager import read_jsonl
 from src.data import make_examples, PretrainDataset, Collator
@@ -143,6 +143,15 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
     scaler = torch.cuda.amp.GradScaler(enabled=torch.cuda.is_available())
 
+    total_train_steps = config["num_train_epochs"] * max(1, len(train_loader))
+
+    scheduler = get_scheduler(
+        "linear",
+        optimizer=optimizer,
+        num_warmup_steps=config["num_warmup_steps"],
+        num_training_steps=total_train_steps,
+    )
+
     # -------- Training loop --------
     total_train_steps = config["num_train_epochs"] * max(1, len(train_loader))
     global_step = 0
@@ -178,20 +187,15 @@ def main():
             if config.get("grad_clip", 0):
                 scaler.unscale_(optimizer)
 
-                # 🔍 Gradient norm check
-                total_norm = 0.0
-                for p in model.parameters():
-                    if p.grad is not None:
-                        param_norm = p.grad.data.norm(2)
-                        total_norm += param_norm.item() ** 2
-                total_norm = total_norm ** 0.5
-                print(f"[Step {global_step}] Gradient norm: {total_norm:.2f}")
+                max_grad = max((p.grad.abs().max().item() for p in model.parameters() if p.grad is not None), default=0)
+                print(f"[Step {global_step}] Max grad: {max_grad}")
 
                 nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
 
 
                 nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
             scaler.step(optimizer)
+            scheduler.step()
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
 

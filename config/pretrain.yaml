@@ -5,16 +5,16 @@ base_tokenizer: bert-base-uncased
 max_seq_len: 512
 train_batch_size: 32
 val_batch_size: 32
-learning_rate: !!float 2e-5
+learning_rate: !!float 1e-5
 adam_epsilon: !!float 1e-8
 num_train_epochs: 5
 num_warmup_steps: 100
 num_training_steps: 1000
 num_workers: 4
 weight_decay: 0.01
-gradient_accumulation_steps: 1
+gradient_accumulation_steps: 2
 grad_clip: 1.0
-fp16: true
+fp16: false
 logging_steps: 50
 save_total_limit: 2
 save_strategy: steps
@@ -47,7 +47,7 @@ keep_token_probability: 0.10
 loss_weights:
   mlm: 1.0
   sop: 1.0
-  ic2: 1.0
-  ic3: 0.6
-  ic4: 0.3
+  ic2: 0.8
+  ic3: 0.5
+  ic4: 0.2
   consistency: 0.1
