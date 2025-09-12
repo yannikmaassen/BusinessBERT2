@@ -3,9 +3,9 @@ seed: 42
 model_name: bert-base-uncased
 base_tokenizer: bert-base-uncased
 max_seq_len: 512
-train_batch_size: 64
-val_batch_size: 64
-learning_rate: !!float 5e-5
+train_batch_size: 32
+val_batch_size: 32
+learning_rate: !!float 2e-5
 adam_epsilon: !!float 1e-8
 num_train_epochs: 5
 num_warmup_steps: 100

@@ -177,6 +177,19 @@ def main():
             scaler.scale(loss).backward()
             if config.get("grad_clip", 0):
                 scaler.unscale_(optimizer)
+
+                # 🔍 Gradient norm check
+                total_norm = 0.0
+                for p in model.parameters():
+                    if p.grad is not None:
+                        param_norm = p.grad.data.norm(2)
+                        total_norm += param_norm.item() ** 2
+                total_norm = total_norm ** 0.5
+                print(f"[Step {global_step}] Gradient norm: {total_norm:.2f}")
+
+                nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
+
+
                 nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
             scaler.step(optimizer)
             scaler.update()
