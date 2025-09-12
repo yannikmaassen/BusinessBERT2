@@ -141,7 +141,7 @@ def main():
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
-    scaler = torch.cuda.amp.GradScaler(enabled=torch.cuda.is_available())
+    scaler = torch.cuda.amp.GradScaler('cuda', enabled=torch.cuda.is_available())
 
     # -------- Training loop --------
     total_train_steps = config["num_train_epochs"] * max(1, len(train_loader))
