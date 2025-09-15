@@ -141,7 +141,8 @@ def main():
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
-    scaler = torch.cuda.amp.GradScaler(enabled=torch.cuda.is_available())
+    use_amp = bool(config.get("fp16", False)) and torch.cuda.is_available()
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     total_train_steps = config["num_train_epochs"] * max(1, len(train_loader))
 
@@ -179,9 +180,12 @@ def main():
             # -------------------------------------------------------------------
 
             batch = {k: v.to(device) for k, v in batch.items()}
-            with torch.cuda.amp.autocast(enabled=torch.cuda.is_available()):
+            with torch.cuda.amp.autocast(enabled=use_amp):
                 out = model(**batch)
                 loss = out["loss"]
+
+            if use_amp:
+                current_scale = scaler.get_scale()
 
             scaler.scale(loss).backward()
             if config.get("grad_clip", 0):
@@ -192,12 +196,15 @@ def main():
 
                 nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
 
-
-                nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
             scaler.step(optimizer)
             scheduler.step()
             scaler.update()
             optimizer.zero_grad(set_to_none=True)
+
+            if use_amp:
+                new_scale = scaler.get_scale()
+                if new_scale < current_scale:
+                    print(f"[Step {global_step}] AMP overflow detected. scale {current_scale} -> {new_scale}")
 
             for k, v in out["losses"].items():
                 running[f"loss_{k}"] += float(v.item())
