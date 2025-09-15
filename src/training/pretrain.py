@@ -128,6 +128,8 @@ def main():
     # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
+    precision = str(config.get("precision", "fp32")).lower()
+    device_has_cuda = torch.cuda.is_available()
 
     model = BusinessBERT2Pretrain(
         config=bert_config,
@@ -141,8 +143,22 @@ def main():
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
-    use_amp = bool(config.get("fp16", False)) and torch.cuda.is_available()
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+    use_amp = device_has_cuda and precision in {"fp16", "bf16"}
+    amp_kwargs = {}
+    if precision == "fp16":
+        amp_kwargs["dtype"] = torch.float16
+        scaler = torch.cuda.amp.GradScaler(enabled=True)
+    elif precision == "bf16":
+        amp_kwargs["dtype"] = torch.bfloat16
+        scaler = torch.cuda.amp.GradScaler(enabled=False)
+    else:  # fp32
+        scaler = torch.cuda.amp.GradScaler(enabled=False)
+
+    if device_has_cuda:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+
+    print(f"[INIT] precision={precision}, use_amp={use_amp}, amp_dtype={amp_kwargs.get('dtype', 'fp32')}")
 
     total_train_steps = config["num_train_epochs"] * max(1, len(train_loader))
 
@@ -180,31 +196,31 @@ def main():
             # -------------------------------------------------------------------
 
             batch = {k: v.to(device) for k, v in batch.items()}
-            with torch.cuda.amp.autocast(enabled=use_amp):
+            with torch.cuda.amp.autocast(enabled=use_amp, **amp_kwargs):
                 out = model(**batch)
                 loss = out["loss"]
 
-            if use_amp:
-                current_scale = scaler.get_scale()
+            if precision == "fp16":
+                scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
-            scaler.scale(loss).backward()
             if config.get("grad_clip", 0):
-                scaler.unscale_(optimizer)
+                if precision == "fp16":
+                    scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
 
                 max_grad = max((p.grad.abs().max().item() for p in model.parameters() if p.grad is not None), default=0)
                 print(f"[Step {global_step}] Max grad: {max_grad}")
 
-                nn.utils.clip_grad_norm_(model.parameters(), config["grad_clip"])
+            if precision == "fp16":
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
 
-            scaler.step(optimizer)
             scheduler.step()
-            scaler.update()
             optimizer.zero_grad(set_to_none=True)
-
-            if use_amp:
-                new_scale = scaler.get_scale()
-                if new_scale < current_scale:
-                    print(f"[Step {global_step}] AMP overflow detected. scale {current_scale} -> {new_scale}")
 
             for k, v in out["losses"].items():
                 running[f"loss_{k}"] += float(v.item())

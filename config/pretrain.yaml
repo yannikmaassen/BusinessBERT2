@@ -22,6 +22,7 @@ save_steps: 500
 evaluation_strategy: steps
 evaluation_steps: 500
 val_ratio: 0.1
+precision: bf16
 
 # Progress
 report_to: wandb
