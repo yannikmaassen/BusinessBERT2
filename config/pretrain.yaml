@@ -7,7 +7,7 @@ train_batch_size: 64
 val_batch_size: 64
 learning_rate: !!float 3e-5
 adam_epsilon: !!float 1e-8
-num_train_epochs: 5
+num_train_epochs: 1
 num_warmup_steps: 500
 num_training_steps: 1000
 num_workers: 4
