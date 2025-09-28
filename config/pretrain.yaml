@@ -24,6 +24,20 @@ evaluation_steps: 500
 val_ratio: 0.1
 precision: bf16
 
+# MLM params
+mlm_probability: 0.15
+random_token_probability: 0.10
+keep_token_probability: 0.10
+
+# Loss weights
+loss_weights:
+  mlm: 1.0
+  sop: 0.2
+  ic2: 1.0
+  ic3: 0.8
+  ic4: 0.5
+  consistency: 0.1
+
 # Progress
 report_to: wandb
 disable_tqdm: false
@@ -38,17 +52,3 @@ field_sic4: sic4
 # Saving
 save_dir: ./outputs/pretrain
 safe_serialization: false
-
-# MLM params
-mlm_probability: 0.15
-random_token_probability: 0.10
-keep_token_probability: 0.10
-
-# Loss weights
-loss_weights:
-  mlm: 1.0
-  sop: 0.2
-  ic2: 1.0
-  ic3: 0.8
-  ic4: 0.5
-  consistency: 0.1

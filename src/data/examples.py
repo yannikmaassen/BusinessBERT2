@@ -2,7 +2,6 @@ from typing import List
 import random
 
 
-# TODO: IC
 class PretrainExample:
     def __init__(self, sentence_a, sentence_b, sop_label, sic2, sic3, sic4):
         self.sentence_a = sentence_a
@@ -31,4 +30,5 @@ def make_examples(rows: List[dict], field_sentences: str, field_sic2: str, field
             sic3=str(row.get(field_sic3, "")).strip(),
             sic4=str(row.get(field_sic4, "")).strip(),
         ))
+
     return examples

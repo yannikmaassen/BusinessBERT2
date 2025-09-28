@@ -3,7 +3,6 @@ from transformers import BertConfig
 
 
 class BertPretrainHeads(torch.nn.Module):
-    """MLM + SOP heads with tied embeddings."""
     def __init__(self, config: BertConfig, embedding_weights: torch.nn.Embedding):
         super().__init__()
         self.transform = torch.nn.Sequential(

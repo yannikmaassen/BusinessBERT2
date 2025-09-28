@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
 
 
-# TODO: IC
 class PretrainDataset(Dataset):
     def __init__(self, examples, tokenizer: PreTrainedTokenizerBase, max_length: int,
                  idx2: Dict[str, int], idx3: Dict[str, int], idx4: Dict[str, int]):

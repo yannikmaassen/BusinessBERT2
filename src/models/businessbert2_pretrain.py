@@ -44,7 +44,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
         self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
 
-        # ----- NEW: register upward mapping buffers -----
+        # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
         # M42: [|SIC4| x |SIC2|] = A43 @ A32 to sum leaf probs upward to SIC2
         if A43.numel():
@@ -59,8 +59,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         self.register_buffer("M43", M43)  # [|SIC4| x |SIC3|]
         self.register_buffer("M42", M42)  # [|SIC4| x |SIC2|]
-
-
 
         # Register child-to-parent matrices as buffers (non-trainable)
         self.register_buffer(

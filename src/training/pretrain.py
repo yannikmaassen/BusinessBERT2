@@ -7,7 +7,6 @@ from typing import Dict, Tuple
 
 from sklearn.model_selection import train_test_split
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import yaml
@@ -78,7 +77,6 @@ def main():
         f"4-digit={len(taxonomy_maps['sic4_list'])}"
     )
 
-    # Split train/val
     train_rows, val_rows = train_test_split(
         dataset,
         test_size=config["val_ratio"],
@@ -90,16 +88,13 @@ def main():
     train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
     val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
 
-    # Set up tokenizer
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
 
-    # Create train and val datasets
     train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
-    # Create data loaders
     collate = Collator(
         tokenizer=tokenizer,
         mlm_probability=config["mlm_probability"],
@@ -181,7 +176,6 @@ def main():
 
         progress_bar = tqdm(total=len(train_loader), desc=f"Epoch {epoch}", leave=True)
         for step, batch in enumerate(train_loader, start=1):
-            # ----- NEW: set hierarchical weights (coarse->fine) every step -----
             w2, w3, w4 = coarse_to_fine_weights(global_step, total_train_steps)
             base_w2 = float(config["loss_weights"].get("ic2", 1.0))
             base_w3 = float(config["loss_weights"].get("ic3", 1.0))
@@ -255,7 +249,6 @@ def main():
                                                                                                           0) else "-",
                     "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop',
                                                                                                           0) else "-",
-                    # ----- NEW: show all IC losses -----
                     "loss_ic2": f"{(running['loss_ic2'] / max(1, counts['loss_ic2'])):.3f}" if counts.get('loss_ic2',
                                                                                                           0) else "-",
                     "loss_ic3": f"{(running['loss_ic3'] / max(1, counts['loss_ic3'])):.3f}" if counts.get('loss_ic3',
@@ -284,7 +277,6 @@ def main():
                     msg.append(f"acc_ic3:{running['acc_ic3_correct'] / running['acc_ic3_total']:.4f}")
                 if running.get("acc_ic4_total", 0) > 0:
                     msg.append(f"acc_ic4:{running['acc_ic4_correct'] / running['acc_ic4_total']:.4f}")
-                # (Optional) also print current dynamic weights:
                 msg.append(
                     f"w2:{model.loss_weights['ic2']:.3f} w3:{model.loss_weights['ic3']:.3f} w4:{model.loss_weights['ic4']:.3f} wC:{model.loss_weights['consistency']:.3f}")
                 print(" | ".join(msg))
