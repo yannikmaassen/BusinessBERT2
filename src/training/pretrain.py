@@ -187,7 +187,6 @@ def main():
             # keep consistency gentle early on (ramp up over first ~30%)
             progress = min(1.0, global_step / max(1, int(0.3 * total_train_steps)))
             model.loss_weights["consistency"] = float(config["loss_weights"].get("consistency", 0.2)) * progress
-            # -------------------------------------------------------------------
 
             batch = {k: v.to(device) for k, v in batch.items()}
             with torch.cuda.amp.autocast(enabled=use_amp, **amp_kwargs):
@@ -221,44 +220,37 @@ def main():
                 counts[f"loss_{k}"] += 1
 
             correct, total = mlm_accuracy(out["mlm_logits"], batch["mlm_labels"])
-            running["acc_mlm_correct"] += correct;
+            running["acc_mlm_correct"] += correct
             running["acc_mlm_total"] += total
 
             correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
-            running["acc_sop_correct"] += correct;
+            running["acc_sop_correct"] += correct
             running["acc_sop_total"] += total
 
             if out["ic2_logits"] is not None:
                 c, t = top1_accuracy(out["ic2_logits"], batch["sic2"])
-                running["acc_ic2_correct"] += c;
+                running["acc_ic2_correct"] += c
                 running["acc_ic2_total"] += t
             if out["ic3_logits"] is not None:
                 c, t = top1_accuracy(out["ic3_logits"], batch["sic3"])
-                running["acc_ic3_correct"] += c;
+                running["acc_ic3_correct"] += c
                 running["acc_ic3_total"] += t
             if out["ic4_logits"] is not None:
                 c, t = top1_accuracy(out["ic4_logits"], batch["sic4"])
-                running["acc_ic4_correct"] += c;
+                running["acc_ic4_correct"] += c
                 running["acc_ic4_total"] += t
 
             global_step += 1
 
             if step % max(1, config["logging_steps"] // 5) == 0 or step == 1:
                 progress_bar.set_postfix({
-                    "loss_mlm": f"{(running['loss_mlm'] / max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm',
-                                                                                                          0) else "-",
-                    "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop',
-                                                                                                          0) else "-",
-                    "loss_ic2": f"{(running['loss_ic2'] / max(1, counts['loss_ic2'])):.3f}" if counts.get('loss_ic2',
-                                                                                                          0) else "-",
-                    "loss_ic3": f"{(running['loss_ic3'] / max(1, counts['loss_ic3'])):.3f}" if counts.get('loss_ic3',
-                                                                                                          0) else "-",
-                    "loss_ic4": f"{(running['loss_ic4'] / max(1, counts['loss_ic4'])):.3f}" if counts.get('loss_ic4',
-                                                                                                          0) else "-",
-                    "cons": f"{(running['loss_consistency'] / max(1, counts['loss_consistency'])):.3f}" if counts.get(
-                        'loss_consistency', 0) else "-",
-                    "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get(
-                        'acc_sop_total', 0) else "-",
+                    "loss_mlm": f"{(running['loss_mlm'] / max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm', 0) else "-",
+                    "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop', 0) else "-",
+                    "loss_ic2": f"{(running['loss_ic2'] / max(1, counts['loss_ic2'])):.3f}" if counts.get('loss_ic2', 0) else "-",
+                    "loss_ic3": f"{(running['loss_ic3'] / max(1, counts['loss_ic3'])):.3f}" if counts.get('loss_ic3', 0) else "-",
+                    "loss_ic4": f"{(running['loss_ic4'] / max(1, counts['loss_ic4'])):.3f}" if counts.get('loss_ic4', 0) else "-",
+                    "cons": f"{(running['loss_consistency'] / max(1, counts['loss_consistency'])):.3f}" if counts.get('loss_consistency', 0) else "-",
+                    "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total', 0) else "-",
                 })
 
             if global_step % config["logging_steps"] == 0:
@@ -288,7 +280,6 @@ def main():
         print(f"Epoch {epoch} finished in {dt / 60:.1f} min")
         run_eval(model, device, val_loader, desc=f"VAL epoch {epoch}")
 
-    # ---------------- Save ----------------
     model.save_pretrained(config["save_dir"], safe_serialization=bool(config.get("safe_serialization", False)))
     tokenizer.save_pretrained(config["save_dir"])
     print(f"Saved to {config['save_dir']}")
