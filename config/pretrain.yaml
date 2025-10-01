@@ -7,7 +7,7 @@ train_batch_size: 128
 val_batch_size: 128
 learning_rate: !!float 5e-5
 adam_epsilon: !!float 1e-8
-num_train_epochs: 10
+num_train_epochs: 80
 num_warmup_steps: 500
 num_training_steps: 1000
 num_workers: 4
@@ -43,9 +43,9 @@ report_to: wandb
 disable_tqdm: false
 
 # Debugging
-overfit_single_batch: true
+overfit_single_batch: false
 overfit_steps_per_epoch: 100
-overfit_eval_on_train_batch: true
+overfit_eval_on_train_batch: false
 
 # Data
 jsonl_path: "${data}"
