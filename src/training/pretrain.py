@@ -4,6 +4,7 @@ import os
 import random
 import time
 from typing import Dict, Tuple
+import wandb
 
 from sklearn.model_selection import train_test_split
 import torch
@@ -64,6 +65,19 @@ def main():
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(int(config.get("seed", 42)))
+
+    use_wandb = (config.get("report_to", "").lower() == "wandb")
+    wb = None
+    if use_wandb and wandb is not None:
+        wb_init_kwargs = dict(
+            project     = config.get("wandb_project", "businessbert2"),
+            mode        = config.get("wandb_mode", "online"),   # "online" | "offline" | "disabled"
+            resume      = "allow",
+        )
+        wb_init_kwargs = {k: v for k, v in wb_init_kwargs.items() if v is not None}
+        wb = wandb.init(**wb_init_kwargs, config=config)
+        wandb.define_metric("global_step")
+        wandb.define_metric("*", step_metric="global_step")
 
     # ---------------- Data ----------------
     dataset = read_jsonl(config["jsonl_path"])
@@ -137,6 +151,9 @@ def main():
     )
     model.to(device)
 
+    if use_wandb and wandb is not None and config.get("wandb_watch", True):
+        wandb.watch(model, log="gradients", log_freq=max(1, int(config.get("logging_steps", 50))))
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["learning_rate"], weight_decay=config["weight_decay"])
     use_amp = device_has_cuda and precision in {"fp16", "bf16"}
     amp_kwargs = {}
@@ -176,6 +193,8 @@ def main():
 
         progress_bar = tqdm(total=len(train_loader), desc=f"Epoch {epoch}", leave=True)
         for step, batch in enumerate(train_loader, start=1):
+            step_t0 = time.time()
+
             w2, w3, w4 = coarse_to_fine_weights(global_step, total_train_steps)
             base_w2 = float(config["loss_weights"].get("ic2", 1.0))
             base_w3 = float(config["loss_weights"].get("ic3", 1.0))
@@ -253,32 +272,72 @@ def main():
                     "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total', 0) else "-",
                 })
 
-            if global_step % config["logging_steps"] == 0:
-                msg = [f"epoch {epoch} step {global_step}"]
-                for key in ["mlm", "sop", "ic2", "ic3", "ic4", "consistency"]:
-                    loss_key = f"loss_{key}"
-                    if counts.get(loss_key, 0):
-                        msg.append(f"{loss_key}:{running[loss_key] / counts[loss_key]:.4f}")
-                if running.get("acc_mlm_total", 0) > 0:
-                    msg.append(f"acc_mlm:{running['acc_mlm_correct'] / max(1, running['acc_mlm_total']):.4f}")
-                if running.get("acc_sop_total", 0) > 0:
-                    msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
-                if running.get("acc_ic2_total", 0) > 0:
-                    msg.append(f"acc_ic2:{running['acc_ic2_correct'] / running['acc_ic2_total']:.4f}")
-                if running.get("acc_ic3_total", 0) > 0:
-                    msg.append(f"acc_ic3:{running['acc_ic3_correct'] / running['acc_ic3_total']:.4f}")
-                if running.get("acc_ic4_total", 0) > 0:
-                    msg.append(f"acc_ic4:{running['acc_ic4_correct'] / running['acc_ic4_total']:.4f}")
-                msg.append(
-                    f"w2:{model.loss_weights['ic2']:.3f} w3:{model.loss_weights['ic3']:.3f} w4:{model.loss_weights['ic4']:.3f} wC:{model.loss_weights['consistency']:.3f}")
-                print(" | ".join(msg))
+                # ---- W&B logging at interval
+                if use_wandb and wandb is not None and (global_step % config["logging_steps"] == 0):
+                    log = {"global_step": global_step, "epoch": epoch}
+                    # averaged losses
+                    for key in ["mlm", "sop", "ic2", "ic3", "ic4", "consistency"]:
+                        lk = f"loss_{key}"
+                        if counts.get(lk, 0):
+                            log[f"train/{lk}"] = running[lk] / counts[lk]
+                    # accuracies
+                    if running.get("acc_mlm_total", 0) > 0:
+                        log["train/acc_mlm"] = running["acc_mlm_correct"] / max(1, running["acc_mlm_total"])
+                    if running.get("acc_sop_total", 0) > 0:
+                        log["train/acc_sop"] = running["acc_sop_correct"] / max(1, running["acc_sop_total"])
+                    if running.get("acc_ic2_total", 0) > 0:
+                        log["train/acc_ic2"] = running["acc_ic2_correct"] / running["acc_ic2_total"]
+                    if running.get("acc_ic3_total", 0) > 0:
+                        log["train/acc_ic3"] = running["acc_ic3_correct"] / running["acc_ic3_total"]
+                    if running.get("acc_ic4_total", 0) > 0:
+                        log["train/acc_ic4"] = running["acc_ic4_correct"] / running["acc_ic4_total"]
+
+                    # dynamic loss weights + lr + timing + (optional) max grad
+                    log.update({
+                        "train/w_ic2": float(model.loss_weights["ic2"]),
+                        "train/w_ic3": float(model.loss_weights["ic3"]),
+                        "train/w_ic4": float(model.loss_weights["ic4"]),
+                        "train/w_consistency": float(model.loss_weights["consistency"]),
+                        "train/lr": float(scheduler.get_last_lr()[0]),
+                        "train/step_time_s": time.time() - step_t0
+                    })
+
+                    wandb.log(log, step=global_step)
+
+                    # keep your console msg
+                    msg = [f"epoch {epoch} step {global_step}"]
+                    for key in ["mlm", "sop", "ic2", "ic3", "ic4", "consistency"]:
+                        lk = f"loss_{key}"
+                        if counts.get(lk, 0):
+                            msg.append(f"{lk}:{running[lk] / counts[lk]:.4f}")
+                    if running.get("acc_mlm_total", 0) > 0:
+                        msg.append(f"acc_mlm:{running['acc_mlm_correct'] / max(1, running['acc_mlm_total']):.4f}")
+                    if running.get("acc_sop_total", 0) > 0:
+                        msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
+                    if running.get("acc_ic2_total", 0) > 0:
+                        msg.append(f"acc_ic2:{running['acc_ic2_correct'] / running['acc_ic2_total']:.4f}")
+                    if running.get("acc_ic3_total", 0) > 0:
+                        msg.append(f"acc_ic3:{running['acc_ic3_correct'] / running['acc_ic3_total']:.4f}")
+                    if running.get("acc_ic4_total", 0) > 0:
+                        msg.append(f"acc_ic4:{running['acc_ic4_correct'] / running['acc_ic4_total']:.4f}")
+                    msg.append(
+                        f"w2:{model.loss_weights['ic2']:.3f} w3:{model.loss_weights['ic3']:.3f} w4:{model.loss_weights['ic4']:.3f} wC:{model.loss_weights['consistency']:.3f}")
+                    print(" | ".join(msg))
 
             progress_bar.update(1)
 
         progress_bar.close()
         dt = time.time() - t0
         print(f"Epoch {epoch} finished in {dt / 60:.1f} min")
-        run_eval(model, device, val_loader, desc=f"VAL epoch {epoch}")
+
+        val_metrics = run_eval(model, device, val_loader, desc=f"VAL epoch {epoch}")
+
+        if use_wandb and wandb is not None:
+            log = {"global_step": global_step, "epoch": epoch, "epoch_time_min": dt / 60.0}
+            if isinstance(val_metrics, dict):
+                for k, v in val_metrics.items():
+                    log[f"val/{k}"] = float(v) if isinstance(v, (int, float)) else v
+            wandb.log(log, step=global_step)
 
     model.save_pretrained(config["save_dir"], safe_serialization=bool(config.get("safe_serialization", False)))
     tokenizer.save_pretrained(config["save_dir"])
