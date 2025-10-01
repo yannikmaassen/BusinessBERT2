@@ -3,9 +3,9 @@ seed: 42
 model_name: bert-base-uncased
 base_tokenizer: bert-base-uncased
 max_seq_len: 512
-train_batch_size: 64
-val_batch_size: 64
-learning_rate: !!float 3e-5
+train_batch_size: 128
+val_batch_size: 128
+learning_rate: !!float 5e-5
 adam_epsilon: !!float 1e-8
 num_train_epochs: 10
 num_warmup_steps: 500
@@ -41,6 +41,11 @@ loss_weights:
 # Progress
 report_to: wandb
 disable_tqdm: false
+
+# Debugging
+overfit_single_batch: true
+overfit_steps_per_epoch: 100
+overfit_eval_on_train_batch: true
 
 # Data
 jsonl_path: "${data}"
