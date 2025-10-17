@@ -365,7 +365,10 @@ def main():
             for step, batch in enumerate(train_loader, start=1):
                 step_t0 = time.time()
 
-                w2, w3, w4 = coarse_to_fine_weights(global_step, total_train_steps)
+                w2, w3, w4 = 1, 1, 1
+                if config["coarse_to_fine_weights"]:
+                    w2, w3, w4 = coarse_to_fine_weights(global_step, total_train_steps)
+
                 base_w2 = float(config["loss_weights"].get("ic2", 1.0))
                 base_w3 = float(config["loss_weights"].get("ic3", 1.0))
                 base_w4 = float(config["loss_weights"].get("ic4", 1.0))

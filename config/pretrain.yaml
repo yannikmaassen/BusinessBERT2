@@ -7,7 +7,7 @@ train_batch_size: 128
 val_batch_size: 128
 learning_rate: !!float 5e-5
 adam_epsilon: !!float 1e-8
-num_train_epochs: 80
+num_train_epochs: 40
 num_warmup_steps: 500
 num_training_steps: 1000
 num_workers: 4
@@ -46,6 +46,7 @@ disable_tqdm: false
 overfit_single_batch: false
 overfit_steps_per_epoch: 100
 overfit_eval_on_train_batch: false
+coarse_to_fine_weights: false
 
 # Data
 jsonl_path: "${data}"
