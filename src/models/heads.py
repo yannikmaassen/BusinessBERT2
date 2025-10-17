@@ -1,5 +1,6 @@
 import torch
 from transformers import BertConfig
+import math
 
 
 class BertPretrainHeads(torch.nn.Module):
@@ -11,7 +12,14 @@ class BertPretrainHeads(torch.nn.Module):
             torch.nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps),
         )
         self.mlm_decoder = torch.nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        self.mlm_bias = torch.nn.Parameter(torch.zeros(config.vocab_size))
+
+        # Better bias initialization: slightly positive for common tokens
+        # Initialize with small positive values scaled by vocab size
+        # This helps the model start predicting common tokens earlier in training
+        init_value = 1.0 / math.sqrt(config.vocab_size)
+        self.mlm_bias = torch.nn.Parameter(torch.ones(config.vocab_size) * init_value)
+
+        # Tied weights between embedding and output layer (standard practice)
         self.mlm_decoder.weight = embedding_weights.weight
         self.sop_classifier = torch.nn.Linear(config.hidden_size, 2)
 

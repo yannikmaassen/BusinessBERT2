@@ -31,11 +31,11 @@ keep_token_probability: 0.10
 
 # Loss weights
 loss_weights:
-  mlm: 1.0
+  mlm: 2.0  # Increased to emphasize MLM learning
   sop: 0.2
-  ic2: 1.0
-  ic3: 0.8
-  ic4: 0.5
+  ic2: 0.7
+  ic3: 0.5
+  ic4: 0.3
   consistency: 0.1
 
 # Progress
