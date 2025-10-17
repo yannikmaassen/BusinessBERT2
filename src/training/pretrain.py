@@ -110,10 +110,7 @@ def main():
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
     collate = Collator(
-        tokenizer=tokenizer,
-        mlm_probability=config["mlm_probability"],
-        rand_probability=config["random_token_probability"],
-        keep_probability=config["keep_token_probability"],
+        tokenizer=tokenizer
     )
 
     train_loader = DataLoader(

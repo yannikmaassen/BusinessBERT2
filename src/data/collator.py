@@ -6,11 +6,10 @@ from transformers import PreTrainedTokenizerBase
 
 @dataclass
 class Collator:
-    # TODO: check for correct tokenizer type
     tokenizer: PreTrainedTokenizerBase
     mlm_probability: float = 0.15  # Default to standard BERT value
+    rand_probability: float = 0.1  # 10% of masked tokens are random tokens
     mask_probability: float = 0.8  # 80% of masked tokens are [MASK]
-    random_probability: float = 0.1  # 10% of masked tokens are random tokens
     # The remaining 10% of masked tokens are kept unchanged
 
     def mask_tokens(self, input_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
