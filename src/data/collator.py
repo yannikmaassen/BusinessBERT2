@@ -44,7 +44,7 @@ class Collator:
         # Create a mask for the 10% to be replaced with random tokens
         # This should be applied to the remaining 20% of masked tokens not yet converted to [MASK]
         remaining_indices = masked_indices & ~mask_indices
-        random_indices = torch.bernoulli(torch.full(labels.shape, self.random_probability / (1 - self.mask_probability), device=labels.device)).bool() & remaining_indices
+        random_indices = torch.bernoulli(torch.full(labels.shape, self.rand_probability / (1 - self.mask_probability), device=labels.device)).bool() & remaining_indices
 
         # Generate random words for the 10% case
         random_words = torch.randint(len(self.tokenizer), labels.shape, dtype=torch.long, device=labels.device)
