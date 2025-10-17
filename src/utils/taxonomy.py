@@ -10,9 +10,22 @@ def _row_normalize(m: torch.Tensor) -> torch.Tensor:
 
 
 def build_taxonomy_maps(rows: List[dict], f2: str, f3: str, f4: str) -> Dict:
-    s2 = sorted({str(r.get(f2, "")).strip() for r in rows if str(r.get(f2, "")).strip()})
-    s3 = sorted({str(r.get(f3, "")).strip() for r in rows if str(r.get(f3, "")).strip()})
-    s4 = sorted({str(r.get(f4, "")).strip() for r in rows if str(r.get(f4, "")).strip()})
+    # Filter out "NA" values when building valid SIC code lists
+    s2 = sorted({
+        str(r.get(f2, "")).strip()
+        for r in rows
+        if str(r.get(f2, "")).strip() and str(r.get(f2, "")).strip().upper() != "NA"
+    })
+    s3 = sorted({
+        str(r.get(f3, "")).strip()
+        for r in rows
+        if str(r.get(f3, "")).strip() and str(r.get(f3, "")).strip().upper() != "NA"
+    })
+    s4 = sorted({
+        str(r.get(f4, "")).strip()
+        for r in rows
+        if str(r.get(f4, "")).strip() and str(r.get(f4, "")).strip().upper() != "NA"
+    })
 
     idx2 = {c: i for i, c in enumerate(s2)}
     idx3 = {c: i for i, c in enumerate(s3)}

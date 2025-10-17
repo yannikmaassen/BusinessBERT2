@@ -24,11 +24,22 @@ def make_examples(rows: List[dict], field_sentences: str, field_sic2: str, field
         if random.random() < 0.5:
             sentence_a, sentence_b = sentence_b, sentence_a
             sop_label = 0
+
+        # Handle "NA" values by converting them to empty strings
+        sic2_val = str(row.get(field_sic2, "")).strip()
+        sic2_val = "" if sic2_val.upper() == "NA" else sic2_val
+
+        sic3_val = str(row.get(field_sic3, "")).strip()
+        sic3_val = "" if sic3_val.upper() == "NA" else sic3_val
+
+        sic4_val = str(row.get(field_sic4, "")).strip()
+        sic4_val = "" if sic4_val.upper() == "NA" else sic4_val
+
         examples.append(PretrainExample(
             sentence_a=sentence_a, sentence_b=sentence_b, sop_label=sop_label,
-            sic2=str(row.get(field_sic2, "")).strip(),
-            sic3=str(row.get(field_sic3, "")).strip(),
-            sic4=str(row.get(field_sic4, "")).strip(),
+            sic2=sic2_val,
+            sic3=sic3_val,
+            sic4=sic4_val,
         ))
 
     return examples
