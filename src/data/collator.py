@@ -7,7 +7,7 @@ from transformers import (
 )
 
 @dataclass
-class BertPretrainCollator:
+class Collator:
     tokenizer: PreTrainedTokenizerBase
     mlm_probability: float = 0.15
 
