@@ -107,7 +107,7 @@ def main():
             all_texts.append(text)
 
     print(f"Analyzing {len(all_texts)} text examples")
-    stats = analyze_tokenization(all_texts, tokenizer)
+    stats = analyze_tokenization(all_texts, tokenizer, field)
 
 if __name__ == "__main__":
     main()
