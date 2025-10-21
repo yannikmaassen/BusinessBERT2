@@ -1,15 +1,16 @@
 import argparse
 import collections
-from typing import List, Dict
+from typing import List
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 
 from src.utils.file_manager import read_jsonl
 
-def analyze_tokenization(texts: List[str], tokenizer, field_name: str):
+def analyze_tokenization(texts: List[str]):
     """Analyze tokenization patterns and identify potentially problematic tokens."""
+    tokenizer = "bert-base-uncased"
+    field_name = "sentences"
     # Calculate token frequencies
     token_counter = collections.Counter()
     unknown_counter = collections.Counter()
