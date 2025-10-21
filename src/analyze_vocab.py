@@ -86,8 +86,8 @@ def main():
     args = parser.parse_args()
 
     # Load dataset
-    print(f"Loading dataset from {args.jsonl}")
-    dataset = read_jsonl(args.jsonl)
+    print(f"Loading dataset from {args.data}")
+    dataset = read_jsonl(args.data)
     print(f"Loaded {len(dataset)} rows")
 
     # Load tokenizer
