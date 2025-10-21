@@ -3,18 +3,18 @@ seed: 42
 model_name: bert-base-uncased
 base_tokenizer: bert-base-uncased
 max_seq_len: 512
-train_batch_size: 32
-val_batch_size: 32
+train_batch_size: 128
+val_batch_size: 128
 learning_rate: !!float 5e-5
 adam_epsilon: !!float 1e-8
-num_train_epochs: 1
-num_warmup_steps: 100
+num_train_epochs: 10
+num_warmup_steps: 500
 num_training_steps: 1000
 num_workers: 4
 weight_decay: 0.01
 gradient_accumulation_steps: 1
 grad_clip: 1.0
-fp16: true
+fp16: false
 logging_steps: 50
 save_total_limit: 2
 save_strategy: steps
@@ -22,10 +22,31 @@ save_steps: 500
 evaluation_strategy: steps
 evaluation_steps: 500
 val_ratio: 0.1
+precision: bf16
+
+# MLM params
+mlm_probability: 0.15
+random_token_probability: 0.10
+keep_token_probability: 0.10
+
+# Loss weights
+loss_weights:
+  mlm: 2.0  # Increased to emphasize MLM learning
+  sop: 0.2
+  ic2: 0.7
+  ic3: 0.5
+  ic4: 0.3
+  consistency: 0.1
 
 # Progress
 report_to: wandb
 disable_tqdm: false
+
+# Debugging
+overfit_single_batch: false
+overfit_steps_per_epoch: 100
+overfit_eval_on_train_batch: false
+coarse_to_fine_weights: false
 
 # Data
 jsonl_path: "${data}"
@@ -37,17 +58,3 @@ field_sic4: sic4
 # Saving
 save_dir: ./outputs/pretrain
 safe_serialization: false
-
-# MLM params
-mlm_probability: 0.15
-random_token_probability: 0.10
-keep_token_probability: 0.10
-
-# Loss weights
-loss_weights:
-  mlm: 1.0
-  sop: 1.0
-  ic2: 1.0
-  ic3: 0.6
-  ic4: 0.3
-  consistency: 0.1

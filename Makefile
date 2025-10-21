@@ -54,3 +54,9 @@ clean:
 
 pretrain:
 	python -m src.training.pretrain --config config/pretrain.yaml --data ./data/sample.jsonl
+
+analyze_vocab:
+	python -m src.analyze_vocab --config config/pretrain.yaml --data ./data/sample.jsonl
+
+analyze-vocab-colab:
+	$(PY) -m src.analyze_vocab --data $(DATA)
