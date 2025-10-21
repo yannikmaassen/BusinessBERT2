@@ -42,9 +42,6 @@ class BusinessBERT2Pretrain(BertForPreTraining):
         self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes) if n_sic4_classes > 0 else None
 
         # Register upward mapping buffers if needed
-        self.child_to_parent_matrix_sic4_to_sic3 = None
-        self.child_to_parent_matrix_sic4_to_sic2 = None
-
         if A43 is not None and A43.numel() > 0:
             M43 = A43.clone().to(torch.float32).contiguous()
             self.register_buffer("child_to_parent_matrix_sic4_to_sic3", M43)
@@ -52,6 +49,9 @@ class BusinessBERT2Pretrain(BertForPreTraining):
             if A32 is not None and A32.numel() > 0:
                 M42 = torch.matmul(A43.to(torch.float32), A32.to(torch.float32)).contiguous()
                 self.register_buffer("child_to_parent_matrix_sic4_to_sic2", M42)
+        else:
+            self.register_buffer("child_to_parent_matrix_sic4_to_sic3", None)
+            self.register_buffer("child_to_parent_matrix_sic4_to_sic2", None)
 
         self.loss_weights = loss_weights or {
             "mlm": 1.0,
