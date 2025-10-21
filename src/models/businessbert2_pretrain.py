@@ -2,7 +2,7 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertConfig, BertForPreTraining, PreTrainedModel
+from transformers import BertForPreTraining
 
 
 def _kl_div(p_log, q, eps: float = 1e-8):
@@ -14,127 +14,136 @@ def _kl_div(p_log, q, eps: float = 1e-8):
     return F.kl_div(p_log, q.clamp(min=eps), reduction="batchmean")
 
 
-class BusinessBERT2Pretrain(PreTrainedModel):
+class BusinessBERT2Pretrain(BertForPreTraining):
     """
-    BERT pretraining model with:
-      - MLM (token-level) and NSP (sentence-level) using Hugging Face's BertForPreTraining
-      - IC hierarchical (SIC2/3/4) + upward consistency (SIC4→SIC3 and SIC4→SIC2 via KL)
-        * Multi-level cross-entropy at SIC2, SIC3, SIC4
-        * Consistency encourages ancestor heads (SIC2/SIC3) to match leaf-implied marginals from SIC4
+    BERT pretraining model with MLM and NSP from BertForPreTraining, plus:
+    - IC hierarchical (SIC2/3/4) + upward consistency (SIC4→SIC3 and SIC4→SIC2 via KL)
+      * Multi-level cross-entropy at SIC2, SIC3, SIC4
+      * Consistency encourages ancestor heads (SIC2/SIC3) to match leaf-implied marginals from SIC4
     """
 
     def __init__(
         self,
-        config: BertConfig,
-        n_sic2_classes: int,
-        n_sic3_classes: int,
-        n_sic4_classes: int,
-        A32: torch.Tensor,  # [|SIC3| x |SIC2|] child->parent indicator (3->2)
-        A43: torch.Tensor,  # [|SIC4| x |SIC3|] child->parent indicator (4->3)
-        loss_weights: Dict[str, float],
+        config,
+        n_sic2_classes: int = 0,
+        n_sic3_classes: int = 0,
+        n_sic4_classes: int = 0,
+        A32: Optional[torch.Tensor] = None,  # [|SIC3| x |SIC2|] child->parent indicator (3->2)
+        A43: Optional[torch.Tensor] = None,  # [|SIC4| x |SIC3|] child->parent indicator (4->3)
+        loss_weights: Optional[Dict[str, float]] = None,
     ):
         super().__init__(config)
-        # Use the pre-built BERT for pretraining (includes MLM and NSP heads)
-        self.bert = BertForPreTraining(config)
+        # Use BertForPreTraining's MLM and NSP heads
+
+        # Add industry classification heads
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes) if n_sic2_classes > 0 else None
+        self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes) if n_sic3_classes > 0 else None
+        self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes) if n_sic4_classes > 0 else None
 
-        # Industry classification heads
-        self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
-        self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
-        self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
+        # Register upward mapping buffers if needed
+        self.child_to_parent_matrix_sic4_to_sic3 = None
+        self.child_to_parent_matrix_sic4_to_sic2 = None
 
-        # register upward mapping buffers
-        # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
-        # M42: [|SIC4| x |SIC2|] = A43 @ A32 to sum leaf probs upward to SIC2
-        if A43.numel():
+        if A43 is not None and A43.numel() > 0:
             M43 = A43.clone().to(torch.float32).contiguous()
-        else:
-            M43 = torch.empty(0)
+            self.register_buffer("child_to_parent_matrix_sic4_to_sic3", M43)
 
-        if A43.numel() and A32.numel():
-            M42 = torch.matmul(A43.to(torch.float32), A32.to(torch.float32)).contiguous()
-        else:
-            M42 = torch.empty(0)
+            if A32 is not None and A32.numel() > 0:
+                M42 = torch.matmul(A43.to(torch.float32), A32.to(torch.float32)).contiguous()
+                self.register_buffer("child_to_parent_matrix_sic4_to_sic2", M42)
 
-        self.register_buffer("child_to_parent_matrix_sic4_to_sic3", M43)  # [|SIC4| x |SIC3|]
-        self.register_buffer("child_to_parent_matrix_sic4_to_sic2", M42)  # [|SIC4| x |SIC2|]
-
-        self.loss_weights = dict(loss_weights)
+        self.loss_weights = loss_weights or {
+            "mlm": 1.0,
+            "nsp": 1.0,
+            "ic2": 0.0,
+            "ic3": 0.0,
+            "ic4": 0.0,
+            "consistency": 0.0
+        }
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
-
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         attention_mask=None,
         token_type_ids=None,
-        mlm_labels=None,
-        sop_labels=None,
-        sic2=None,
-        sic3=None,
-        sic4=None,
-        return_dict=True,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        labels=None,  # MLM labels
+        next_sentence_label=None,  # NSP label
+        sic2=None,  # SIC2 label
+        sic3=None,  # SIC3 label
+        sic4=None,  # SIC4 label
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
     ):
-        # Get outputs from the BERT pretraining model (includes MLM and NSP heads)
-        bert_outputs = self.bert(
+        # First, get the standard BERT pretraining outputs (MLM and NSP)
+        bert_outputs = super().forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
-            labels=mlm_labels,
-            next_sentence_label=sop_labels,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            next_sentence_label=next_sentence_label,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
             return_dict=True,
         )
 
-        # bert_outputs contains:
-        # - loss: combined MLM and NSP loss if labels are provided
-        # - prediction_logits: MLM logits
-        # - seq_relationship_logits: NSP logits
-        # - hidden_states: optional depending on config
-        # - attentions: optional depending on config
+        # The base loss from BERT pretraining (MLM + NSP)
+        bert_loss = bert_outputs.loss if bert_outputs.loss is not None else 0.0
 
-        # Get the pooled output for industry classification tasks
-        pooled_output = self.dropout(self.bert.bert.pooler(self.bert.bert(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-            return_dict=True
-        ).last_hidden_state))
+        # Track individual losses
+        losses = {}
+        if labels is not None:
+            mlm_loss = self.ce(
+                bert_outputs.prediction_logits.view(-1, self.config.vocab_size),
+                labels.view(-1)
+            )
+            losses["mlm"] = mlm_loss
+
+        if next_sentence_label is not None:
+            nsp_loss = self.ce(
+                bert_outputs.seq_relationship_logits,
+                next_sentence_label
+            )
+            losses["sop"] = nsp_loss  # Using 'sop' for consistency with original code
+
+        # Apply loss weights to MLM and NSP
+        total_loss = (
+            self.loss_weights.get("mlm", 1.0) * losses.get("mlm", 0.0) +
+            self.loss_weights.get("sop", 1.0) * losses.get("sop", 0.0)
+        )
+
+        # If no industry classification tasks are used, just return BERT pretraining outputs
+        if sic2 is None and sic3 is None and sic4 is None:
+            if not return_dict:
+                return (total_loss,) + bert_outputs[1:]
+
+            result = bert_outputs.to_tuple()
+            result = (total_loss,) + result[1:]
+            return result
+
+        # Add industry classification tasks
+        # Get pooled output for classification
+        pooled_output = self.dropout(self.bert.pooler(
+            self.bert(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                return_dict=True
+            ).last_hidden_state
+        ))
 
         # Industry classification logits
         sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None
         sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None
         sic4_logits = self.head_sic4(pooled_output) if self.head_sic4 is not None else None
-
-        losses = {}
-        total_loss = 0.0
-
-        # Add MLM and NSP losses from the BertForPreTraining output
-        if mlm_labels is not None or sop_labels is not None:
-            if bert_outputs.loss is not None:
-                # If both labels are provided, the built-in loss already combines MLM and NSP
-                bert_loss = bert_outputs.loss
-
-                # Split the loss into MLM and NSP components for tracking
-                mlm_loss = None
-                sop_loss = None
-
-                if mlm_labels is not None:
-                    mlm_loss = self.ce(
-                        bert_outputs.prediction_logits.view(-1, self.config.vocab_size),
-                        mlm_labels.view(-1)
-                    )
-                    losses["mlm"] = mlm_loss
-
-                if sop_labels is not None:
-                    sop_loss = self.ce(bert_outputs.seq_relationship_logits, sop_labels)
-                    losses["sop"] = sop_loss
-
-                # Apply weights to the BERT loss (MLM + NSP)
-                mlm_weight = self.loss_weights.get("mlm", 1.0)
-                sop_weight = self.loss_weights.get("sop", 1.0)
-
-                # Add weighted BERT loss to total
-                total_loss += bert_loss * (mlm_weight + sop_weight) / 2
 
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
@@ -153,8 +162,8 @@ class BusinessBERT2Pretrain(PreTrainedModel):
             total_loss += self.loss_weights.get("ic4", 0.0) * ic4_loss
 
         # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
-        have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (self.child_to_parent_matrix_sic4_to_sic3.numel() > 0)
-        have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (self.child_to_parent_matrix_sic4_to_sic2.numel() > 0)
+        have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and hasattr(self, "child_to_parent_matrix_sic4_to_sic3") and self.child_to_parent_matrix_sic4_to_sic3 is not None
+        have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and hasattr(self, "child_to_parent_matrix_sic4_to_sic2") and self.child_to_parent_matrix_sic4_to_sic2 is not None
 
         if have_m43 or have_m42:
             parts = []
@@ -179,14 +188,12 @@ class BusinessBERT2Pretrain(PreTrainedModel):
                 losses["consistency"] = consistency_loss
                 total_loss += self.loss_weights.get("consistency", 0.0) * consistency_loss
 
-        if not return_dict:
-            return total_loss
-
+        # Return everything in the format expected by the Trainer
         return {
             "loss": total_loss,
             "losses": losses,
-            "mlm_logits": bert_outputs.prediction_logits,
-            "sop_logits": bert_outputs.seq_relationship_logits,
+            "logits": bert_outputs.prediction_logits,
+            "seq_relationship_logits": bert_outputs.seq_relationship_logits,
             "ic2_logits": sic2_logits,
             "ic3_logits": sic3_logits,
             "ic4_logits": sic4_logits,

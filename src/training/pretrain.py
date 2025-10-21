@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import yaml
 
-from transformers import AutoTokenizer, BertConfig, get_scheduler
+from transformers import AutoTokenizer, BertConfig, get_scheduler, BertTokenizer
 
 from src.utils.file_manager import read_jsonl
 from src.data import make_examples, PretrainDataset, Collator
@@ -102,6 +102,7 @@ def main():
     train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
     val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
 
+    # Use Hugging Face's tokenizer
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
@@ -109,8 +110,10 @@ def main():
     train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
+    # Use the simplified collator that leverages HuggingFace's DataCollatorForLanguageModeling
     collate = Collator(
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
+        mlm_probability=config.get("mlm_probability", 0.15)
     )
 
     train_loader = DataLoader(
@@ -178,6 +181,7 @@ def main():
     precision = str(config.get("precision", "fp32")).lower()
     device_has_cuda = torch.cuda.is_available()
 
+    # Initialize our simplified model that uses HuggingFace's BertForPreTraining internally
     model = BusinessBERT2Pretrain(
         config=bert_config,
         n_sic2_classes=len(taxonomy_maps["sic2_list"]),

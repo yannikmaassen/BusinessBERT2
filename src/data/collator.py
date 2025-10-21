@@ -1,34 +1,44 @@
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import Dict, List, Any
 import torch
 from transformers import PreTrainedTokenizerBase, DataCollatorForLanguageModeling
 
 
 @dataclass
-class Collator:
+class BusinessBERTDataCollator:
+    """
+    Data collator that uses Hugging Face's DataCollatorForLanguageModeling for MLM
+    while also handling industry classification labels.
+    """
     tokenizer: PreTrainedTokenizerBase
-    mlm_probability: float = 0.15  # Default to standard BERT value
+    mlm_probability: float = 0.15
 
     def __post_init__(self):
-        # Use Hugging Face's data collator for MLM
+        # Create the Hugging Face MLM collator
         self.mlm_collator = DataCollatorForLanguageModeling(
             tokenizer=self.tokenizer,
             mlm=True,
-            mlm_probability=self.mlm_probability,
-            return_tensors="pt"
+            mlm_probability=self.mlm_probability
         )
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
-        # Extract input features
+        # Extract industry classification labels
+        sic2 = torch.tensor([f.get("sic2", -100) for f in features], dtype=torch.long)
+        sic3 = torch.tensor([f.get("sic3", -100) for f in features], dtype=torch.long)
+        sic4 = torch.tensor([f.get("sic4", -100) for f in features], dtype=torch.long)
+        sop_labels = torch.tensor([f.get("sop_label", 0) for f in features], dtype=torch.long)
+
+        # Create batch with input features
         batch = {
             "input_ids": [torch.tensor(f["input_ids"], dtype=torch.long) for f in features],
-            "token_type_ids": [torch.tensor(f["token_type_ids"], dtype=torch.long) for f in features],
+            "token_type_ids": [torch.tensor(f.get("token_type_ids", [0] * len(f["input_ids"])), dtype=torch.long) for f in features],
             "attention_mask": [torch.tensor(f["attention_mask"], dtype=torch.long) for f in features],
         }
 
         # Pad sequences
+        pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
         input_ids = torch.nn.utils.rnn.pad_sequence(
-            batch["input_ids"], batch_first=True, padding_value=self.tokenizer.pad_token_id
+            batch["input_ids"], batch_first=True, padding_value=pad_token_id
         )
         token_type_ids = torch.nn.utils.rnn.pad_sequence(
             batch["token_type_ids"], batch_first=True, padding_value=0
@@ -38,31 +48,22 @@ class Collator:
         )
 
         # Apply MLM using Hugging Face's collator
-        mlm_inputs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-        }
-        mlm_batch = self.mlm_collator([{k: v for k, v in zip(mlm_inputs.keys(), values)}
-                                       for values in zip(*(mlm_inputs[k] for k in mlm_inputs.keys()))])
+        # Create dummy dataset entries with the required fields for the MLM collator
+        mlm_inputs = [
+            {"input_ids": ids, "attention_mask": mask}
+            for ids, mask in zip(input_ids, attention_mask)
+        ]
 
-        # Extract masked input_ids and labels
-        input_ids = mlm_batch["input_ids"]
-        mlm_labels = mlm_batch["labels"]  # -100 for unmasked tokens
+        # Apply the MLM collator to get masked inputs and labels
+        mlm_outputs = self.mlm_collator(mlm_inputs)
 
-        # Extract other classification labels
-        sop = torch.tensor([f["sop_label"] for f in features], dtype=torch.long)
-        sic2 = torch.tensor([f["sic2"] for f in features], dtype=torch.long)
-        sic3 = torch.tensor([f["sic3"] for f in features], dtype=torch.long)
-        sic4 = torch.tensor([f["sic4"] for f in features], dtype=torch.long)
-
-
-        # Return batch
+        # Return the combined batch with both MLM and industry classification
         return {
-            "input_ids": input_ids,
+            "input_ids": mlm_outputs["input_ids"],
             "token_type_ids": token_type_ids,
             "attention_mask": attention_mask,
-            "mlm_labels": mlm_labels,
-            "sop_labels": sop,
+            "labels": mlm_outputs["labels"],  # MLM labels
+            "next_sentence_label": sop_labels,  # Renamed from sop_labels to match HF naming
             "sic2": sic2,
             "sic3": sic3,
             "sic4": sic4,

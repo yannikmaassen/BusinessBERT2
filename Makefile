@@ -47,6 +47,10 @@ train-data-colab:
 	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/businessbert_data/sample.jsonl"; exit 1; fi
 	$(PY) -m src.training.pretrain --config $(CONFIG) --data $(DATA)
 
+train-data-colab-simplified:
+	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/businessbert_data/sample.jsonl"; exit 1; fi
+	$(PY) -m src.training.simplified_pretrain --config $(CONFIG) --data $(DATA)
+
 # ====== Cleanup ======
 clean:
 	rm -rf __pycache__ .pytest_cache */__pycache__ *.egg-info
