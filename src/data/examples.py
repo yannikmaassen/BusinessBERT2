@@ -12,7 +12,7 @@ class PretrainExample:
         self.sic4 = sic4
 
 
-def create_memory_efficient_pairs(sentences, max_pairs_per_doc=3, max_sentences_per_segment=6):
+def create_memory_efficient_pairs(sentences, max_pairs_per_doc=3, max_sentences_per_segment=4):
     """
     Creates a limited number of sentence pairs from a document to control memory usage.
 
