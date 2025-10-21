@@ -161,6 +161,20 @@ def main():
     # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
+
+    # Print BERT configuration details
+    print("\n===== BERT Configuration =====")
+    print(f"Vocabulary size: {bert_config.vocab_size}")
+    print(f"Hidden size: {bert_config.hidden_size}")
+    print(f"Number of layers: {bert_config.num_hidden_layers}")
+    print(f"Number of attention heads: {bert_config.num_attention_heads}")
+    print(f"Intermediate size: {bert_config.intermediate_size}")
+    print(f"Hidden dropout prob: {bert_config.hidden_dropout_prob}")
+    print(f"Attention dropout prob: {bert_config.attention_probs_dropout_prob}")
+    print(f"Max position embeddings: {bert_config.max_position_embeddings}")
+    print(f"Type vocab size: {bert_config.type_vocab_size}")
+    print("===============================\n")
+
     precision = str(config.get("precision", "fp32")).lower()
     device_has_cuda = torch.cuda.is_available()
 
