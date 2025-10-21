@@ -7,10 +7,8 @@ from transformers import AutoTokenizer
 
 from src.utils.file_manager import read_jsonl
 
-def analyze_tokenization(texts: List[str]):
+def analyze_tokenization(texts: List[str], tokenizer, field_name):
     """Analyze tokenization patterns and identify potentially problematic tokens."""
-    tokenizer = "bert-base-uncased"
-    field_name = "sentences"
     # Calculate token frequencies
     token_counter = collections.Counter()
     unknown_counter = collections.Counter()
@@ -84,9 +82,7 @@ def analyze_tokenization(texts: List[str]):
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze vocabulary and tokenization patterns in the dataset")
-    parser.add_argument("--jsonl", type=str, required=True, help="Path to the JSONL dataset")
-    parser.add_argument("--field", type=str, required=True, help="Field name containing text to analyze")
-    parser.add_argument("--tokenizer", type=str, default="bert-base-uncased", help="Tokenizer to use")
+    parser.add_argument("--data", type=str, required=True, help="Path to the JSONL dataset")
     args = parser.parse_args()
 
     # Load dataset
@@ -95,12 +91,13 @@ def main():
     print(f"Loaded {len(dataset)} rows")
 
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    field = "sentences"
 
     # Extract texts
     all_texts = []
     for row in dataset:
-        sentences = row.get(args.field, [])
+        sentences = row.get(field, [])
         if not isinstance(sentences, list):
             continue
 
@@ -110,7 +107,7 @@ def main():
             all_texts.append(text)
 
     print(f"Analyzing {len(all_texts)} text examples")
-    stats = analyze_tokenization(all_texts, tokenizer, args.field)
+    stats = analyze_tokenization(all_texts, tokenizer)
 
 if __name__ == "__main__":
     main()
