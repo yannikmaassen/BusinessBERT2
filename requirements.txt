@@ -5,6 +5,7 @@ tokenizers>=0.19.1,<0.21.0
 nltk>=3.9
 pyyaml>=6.0.1
 tqdm>=4.66.0
+peft==0.10.0
 
 torch>=2.3.0
 scikit-learn~=1.7.1
