@@ -12,18 +12,18 @@ class PretrainExample:
         self.sic4 = sic4
 
 
-def create_sentence_pairs(sentences, max_sentences_per_segment=8):
+def create_memory_efficient_pairs(sentences, max_pairs_per_doc=3, max_sentences_per_segment=6):
     """
-    Creates sentence pairs for both SOP and MLM objectives from a document.
+    Creates a limited number of sentence pairs from a document to control memory usage.
 
-    For each document:
-    1. Creates natural consecutive sentence pairs (preserves SOP objective)
-    2. Ensures each pair is of manageable length
-    3. Uses a sliding window approach to maximize context coverage
+    Strategy:
+    1. For short documents: Use the entire document
+    2. For long documents: Create a small fixed number of well-distributed segments
 
     Args:
         sentences: List of sentences from the document
-        max_sentences_per_segment: Maximum number of sentences to combine in a single segment
+        max_pairs_per_doc: Maximum number of pairs to create from one document
+        max_sentences_per_segment: Maximum sentences to include in a single segment
 
     Returns:
         List of tuples (sentence_a, sentence_b) ready for SOP
@@ -37,38 +37,47 @@ def create_sentence_pairs(sentences, max_sentences_per_segment=8):
         else:
             return [(sentences[0], sentences[1])]
 
-    # For longer documents, create meaningful segments
-    # Use a sliding window approach with 50% overlap to maximize coverage
-    stride = max(1, max_sentences_per_segment // 2)
+    # For longer documents, create a limited number of strategic samples
+    doc_length = len(sentences)
 
-    for i in range(0, len(sentences) - 1, stride):
-        # Define the boundary between sentence_a and sentence_b
-        # Ensure we have content for both parts
-        mid_point = min(i + max_sentences_per_segment // 2, len(sentences) - 1)
-        end_point = min(i + max_sentences_per_segment, len(sentences))
-
-        # Skip if we can't form a proper pair
-        if mid_point <= i:
-            continue
-
-        # Create meaningful segments
-        sentence_a = " ".join(sentences[i:mid_point])
-        sentence_b = " ".join(sentences[mid_point:end_point])
-
-        # Only add if both segments have content
-        if sentence_a and sentence_b:
-            pairs.append((sentence_a, sentence_b))
-
-    # If we couldn't create any pairs, try a simpler approach
-    if not pairs and len(sentences) > 1:
-        # Split document in half
-        mid = len(sentences) // 2
+    # If document is not too long, we can simply split it once
+    if doc_length <= max_sentences_per_segment * 2:
+        mid = doc_length // 2
         return [(
             " ".join(sentences[:mid]),
             " ".join(sentences[mid:])
         )]
 
-    return pairs
+    # For very long documents, sample from beginning, middle and end
+    # This ensures coverage of the document without creating too many examples
+    samples = []
+
+    # Calculate segment size based on document length
+    segment_size = min(max_sentences_per_segment, (doc_length // (max_pairs_per_doc * 2)))
+
+    # Beginning of document
+    samples.append((
+        " ".join(sentences[:segment_size]),
+        " ".join(sentences[segment_size:segment_size*2])
+    ))
+
+    # Middle of document (if long enough)
+    if doc_length > max_sentences_per_segment * 4:
+        mid_point = doc_length // 2
+        samples.append((
+            " ".join(sentences[mid_point-segment_size:mid_point]),
+            " ".join(sentences[mid_point:mid_point+segment_size])
+        ))
+
+    # End of document
+    if doc_length > max_sentences_per_segment * 2:
+        samples.append((
+            " ".join(sentences[-(segment_size*2):-segment_size]),
+            " ".join(sentences[-segment_size:])
+        ))
+
+    # Limit the number of samples to control memory usage
+    return samples[:max_pairs_per_doc]
 
 
 def make_examples(rows: List[dict], field_sentences: str, field_sic2: str, field_sic3: str, field_sic4: str):
@@ -88,8 +97,8 @@ def make_examples(rows: List[dict], field_sentences: str, field_sic2: str, field
         sic4_val = str(row.get(field_sic4, "")).strip()
         sic4_val = "" if sic4_val.upper() == "NA" else sic4_val
 
-        # Generate balanced sentence pairs for both MLM and SOP objectives
-        sentence_pairs = create_sentence_pairs(sentences)
+        # Generate a limited number of memory-efficient pairs
+        sentence_pairs = create_memory_efficient_pairs(sentences)
 
         for sentence_a, sentence_b in sentence_pairs:
             # Skip if either part is empty
