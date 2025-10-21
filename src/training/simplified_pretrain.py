@@ -2,64 +2,30 @@ import os
 import random
 import argparse
 import math
-from typing import Dict, Any, Optional
+from typing import Dict
 import torch
 import yaml
 import wandb
-from tqdm.auto import tqdm
 from sklearn.model_selection import train_test_split
-
-# Set PyTorch memory management environment variables
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-
 from transformers import (
     AutoTokenizer,
     BertConfig,
     TrainingArguments,
     Trainer,
-    get_scheduler,
 )
-# Import set_seed directly if available, otherwise define our own function
-try:
-    from transformers import set_seed, EarlyStoppingCallback
-except ImportError:
-    from transformers.trainer_callback import TrainerCallback
-
-    def set_seed(seed: int):
-        """Set random seeds for reproducibility"""
-        random.seed(seed)
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
-
-    # Define EarlyStoppingCallback if not available
-    class EarlyStoppingCallback(TrainerCallback):
-        def __init__(self, early_stopping_patience=5):
-            self.early_stopping_patience = early_stopping_patience
-            self.best_metric = None
-            self.early_stopping_patience_counter = 0
-
-        def on_evaluate(self, args, state, control, metrics, **kwargs):
-            metric_to_check = "eval_loss"
-            if not metric_to_check in metrics:
-                return
-
-            current = metrics[metric_to_check]
-            if self.best_metric is None or current < self.best_metric:
-                self.best_metric = current
-                self.early_stopping_patience_counter = 0
-            else:
-                self.early_stopping_patience_counter += 1
-
-            if self.early_stopping_patience_counter >= self.early_stopping_patience:
-                print(f"\nEarly stopping triggered after {self.early_stopping_patience} evaluations without improvement")
-                control.should_training_stop = True
-
 from src.utils.file_manager import read_jsonl
 from src.utils.taxonomy import build_taxonomy_maps
 from src.data import make_examples, PretrainDataset
 from src.data.collator import BusinessBERTDataCollator
 from src.models import BusinessBERT2Pretrain
+
+# Set PyTorch memory management environment variables
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+def set_seed(seed: int):
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def load_config(path: str, data_override: str = None) -> Dict:
@@ -321,7 +287,6 @@ def main():
         max_grad_norm=config.get("grad_clip", 0) if config.get("grad_clip", 0) > 0 else None,
         # Add more memory optimization options
         optim="adamw_torch",
-        torch_compile=False,  # Disable torch.compile which uses additional memory
     )
 
     # Initialize trainer
@@ -332,8 +297,6 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         loss_weights=config["loss_weights"],
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=config.get("patience", 3))]
-        if config.get("early_stopping", False) else None,
     )
 
     # Train the model
