@@ -14,10 +14,43 @@ from transformers import (
     BertConfig,
     TrainingArguments,
     Trainer,
-    EarlyStoppingCallback,
     get_scheduler,
-    set_seed,
 )
+# Import set_seed directly if available, otherwise define our own function
+try:
+    from transformers import set_seed, EarlyStoppingCallback
+except ImportError:
+    from transformers.trainer_callback import TrainerCallback
+
+    def set_seed(seed: int):
+        """Set random seeds for reproducibility"""
+        random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
+    # Define EarlyStoppingCallback if not available
+    class EarlyStoppingCallback(TrainerCallback):
+        def __init__(self, early_stopping_patience=5):
+            self.early_stopping_patience = early_stopping_patience
+            self.best_metric = None
+            self.early_stopping_patience_counter = 0
+
+        def on_evaluate(self, args, state, control, metrics, **kwargs):
+            metric_to_check = "eval_loss"
+            if not metric_to_check in metrics:
+                return
+
+            current = metrics[metric_to_check]
+            if self.best_metric is None or current < self.best_metric:
+                self.best_metric = current
+                self.early_stopping_patience_counter = 0
+            else:
+                self.early_stopping_patience_counter += 1
+
+            if self.early_stopping_patience_counter >= self.early_stopping_patience:
+                print(f"\nEarly stopping triggered after {self.early_stopping_patience} evaluations without improvement")
+                control.should_training_stop = True
 
 from src.utils.file_manager import read_jsonl
 from src.utils.taxonomy import build_taxonomy_maps
