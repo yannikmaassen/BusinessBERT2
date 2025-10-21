@@ -9,6 +9,9 @@ import wandb
 from tqdm.auto import tqdm
 from sklearn.model_selection import train_test_split
 
+# Set PyTorch memory management environment variables
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 from transformers import (
     AutoTokenizer,
     BertConfig,
@@ -183,6 +186,11 @@ def main():
         random_state=config.get("seed", 42),
     )
 
+    # Free up memory from the original dataset
+    del dataset
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     # Create examples with sentence pairs and labels
     train_examples = make_examples(
         train_rows,
@@ -198,6 +206,11 @@ def main():
         config["field_sic3"],
         config["field_sic4"]
     )
+
+    # Free up more memory
+    del train_rows, val_rows
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     # Initialize tokenizer
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
@@ -222,6 +235,11 @@ def main():
         taxonomy_maps["idx4"]
     )
 
+    # Free up more memory
+    del train_examples, val_examples
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
     # Create data collator
     data_collator = BusinessBERTDataCollator(
         tokenizer=tokenizer,
@@ -244,19 +262,39 @@ def main():
     print(f"Type vocab size: {bert_config.type_vocab_size}")
     print("===============================\n")
 
+    # Check if batch size needs to be reduced due to memory constraints
+    original_batch_size = config.get("train_batch_size", 8)
+    if torch.cuda.is_available() and torch.cuda.get_device_properties(0).total_memory < 10 * 1024 * 1024 * 1024:  # If less than 10GB
+        # Reduce batch size for smaller GPUs
+        reduced_batch_size = max(1, original_batch_size // 2)
+        print(f"WARNING: Reducing batch size from {original_batch_size} to {reduced_batch_size} to fit in GPU memory")
+        config["train_batch_size"] = reduced_batch_size
+        config["val_batch_size"] = max(1, config.get("val_batch_size", 8) // 2)
+
     # Initialize model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Move taxonomy matrices to CPU first, only move to GPU when needed
+    A32 = taxonomy_maps["A32"] if len(taxonomy_maps["sic3_list"]) and len(taxonomy_maps["sic2_list"]) else None
+    A43 = taxonomy_maps["A43"] if len(taxonomy_maps["sic4_list"]) and len(taxonomy_maps["sic3_list"]) else None
+
+    # Build model
     model = BusinessBERT2Pretrain(
         config=bert_config,
         n_sic2_classes=len(taxonomy_maps["sic2_list"]),
         n_sic3_classes=len(taxonomy_maps["sic3_list"]),
         n_sic4_classes=len(taxonomy_maps["sic4_list"]),
-        A32=taxonomy_maps["A32"].to(device) if len(taxonomy_maps["sic3_list"]) and len(taxonomy_maps["sic2_list"]) else None,
-        A43=taxonomy_maps["A43"].to(device) if len(taxonomy_maps["sic4_list"]) and len(taxonomy_maps["sic3_list"]) else None,
+        A32=A32,
+        A43=A43,
         loss_weights=config["loss_weights"],
     )
 
-    # Define training arguments
+    # Clear memory after model initialization
+    del taxonomy_maps, A32, A43
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    # Define training arguments with memory optimization settings
     training_args = TrainingArguments(
         output_dir=output_dir,
         overwrite_output_dir=True,
@@ -272,13 +310,18 @@ def main():
         eval_steps=config.get("eval_steps"),
         save_steps=config.get("save_steps", 1000),
         save_total_limit=config.get("save_total_limit", 3),
+        # Memory optimization settings
         fp16=config.get("precision", "fp32").lower() == "fp16",
         bf16=config.get("precision", "fp32").lower() == "bf16",
         dataloader_num_workers=config["num_workers"],
         report_to="wandb" if use_wandb else "none",
         gradient_accumulation_steps=config.get("gradient_accumulation_steps", 1),
-        gradient_checkpointing=config.get("gradient_checkpointing", False),
+        # Enable gradient checkpointing to save memory
+        gradient_checkpointing=True,
         max_grad_norm=config.get("grad_clip", 0) if config.get("grad_clip", 0) > 0 else None,
+        # Add more memory optimization options
+        optim="adamw_torch",
+        torch_compile=False,  # Disable torch.compile which uses additional memory
     )
 
     # Initialize trainer
