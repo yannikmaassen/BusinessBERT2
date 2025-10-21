@@ -20,7 +20,7 @@ class PretrainDataset(Dataset):
         example = self.examples[idx]
         encoding = self.tokenizer(
             # example.sentence_a if example.sentence_a else "",
-            example.sentence_b if example.sentence_b else None,
+            example.sentence_b if example.sentence_b else "",
             truncation=True,
             max_length=self.max_length,
             padding=False,
