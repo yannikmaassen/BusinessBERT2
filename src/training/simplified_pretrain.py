@@ -55,11 +55,12 @@ def coarse_to_fine_weights(training_step: int, total_steps: int):
 
 
 class CustomTrainer(Trainer):
-    """Custom Trainer to update loss weights during training"""
+    """Custom Trainer to update loss weights during training and log metrics to W&B"""
     def __init__(self, *args, **kwargs):
         self.base_loss_weights = kwargs.pop("loss_weights", {})
         super().__init__(*args, **kwargs)
         self.current_step = 0
+        self.use_wandb = wandb is not None and wandb.run is not None
 
     def training_step(self, model, inputs):
         # Update the loss weights based on training progress
@@ -82,7 +83,83 @@ class CustomTrainer(Trainer):
         self.current_step += 1
 
         # Call the regular training step
-        return super().training_step(model, inputs)
+        outputs = super().training_step(model, inputs)
+
+        # Log detailed metrics to W&B
+        if self.use_wandb and self.current_step % self.args.logging_steps == 0:
+            self._log_training_metrics(model, inputs, outputs)
+
+        return outputs
+
+    def _log_training_metrics(self, model, inputs, outputs):
+        """Log detailed training metrics to W&B"""
+        try:
+            # Extract detailed losses and metrics
+            with torch.no_grad():
+                # Get model outputs with all losses
+                model_outputs = model(**inputs)
+
+                # Base metrics
+                metrics = {
+                    "train/loss": outputs.loss.item(),
+                    "train/learning_rate": self.lr_scheduler.get_last_lr()[0],
+                    "global_step": self.current_step,
+                }
+
+                # Individual loss components
+                if isinstance(model_outputs, dict) and "losses" in model_outputs:
+                    for loss_name, loss_value in model_outputs["losses"].items():
+                        metrics[f"train/loss_{loss_name}"] = loss_value.item()
+
+                # Calculate accuracies
+                if "mlm_logits" in model_outputs and "labels" in inputs:
+                    pred = model_outputs["mlm_logits"].argmax(dim=-1)
+                    mask = inputs["labels"] != -100
+                    correct = (pred[mask] == inputs["labels"][mask]).sum()
+                    total = mask.sum()
+                    if total > 0:
+                        metrics["train/mlm_accuracy"] = (correct / total).item()
+
+                if "seq_relationship_logits" in model_outputs and "next_sentence_label" in inputs:
+                    pred = model_outputs["seq_relationship_logits"].argmax(dim=-1)
+                    correct = (pred == inputs["next_sentence_label"]).sum()
+                    total = inputs["next_sentence_label"].shape[0]
+                    metrics["train/sop_accuracy"] = (correct / total).item()
+
+                # SIC classification accuracies
+                for level in ["ic2", "ic3", "ic4"]:
+                    logit_key = f"{level}_logits"
+                    label_key = level.replace("ic", "sic")
+                    if logit_key in model_outputs and label_key in inputs:
+                        pred = model_outputs[logit_key].argmax(dim=-1)
+                        mask = inputs[label_key] != -100
+                        correct = (pred[mask] == inputs[label_key][mask]).sum()
+                        total = mask.sum()
+                        if total > 0:
+                            metrics[f"train/{level}_accuracy"] = (correct / total).item()
+
+                # Loss weights
+                for key, value in model.loss_weights.items():
+                    metrics[f"train/weight_{key}"] = value
+
+                # Log metrics to W&B
+                wandb.log(metrics, step=self.current_step)
+
+        except Exception as e:
+            # If there's an error during metrics logging, just print a warning and continue
+            print(f"Warning: Error logging metrics to W&B: {e}")
+
+    def evaluate(self, *args, **kwargs):
+        """Override evaluate to add custom metrics logging for evaluation"""
+        output = super().evaluate(*args, **kwargs)
+
+        if self.use_wandb:
+            # Log evaluation metrics to W&B
+            metrics = {f"eval/{k}": v for k, v in output.items()}
+            metrics["global_step"] = self.current_step
+            wandb.log(metrics, step=self.current_step)
+
+        return output
 
     @property
     def steps_per_epoch(self):
