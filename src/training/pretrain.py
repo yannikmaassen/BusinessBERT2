@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import yaml
 
-from transformers import AutoTokenizer, BertConfig, get_scheduler
+from transformers import AutoTokenizer, BertConfig, get_scheduler, DataCollatorForLanguageModeling
 
 from src.utils.file_manager import read_jsonl
 from src.data import make_examples, PretrainDataset, Collator
@@ -113,8 +113,9 @@ def main():
     train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
-    collate = Collator(
-        tokenizer=tokenizer
+    collate = DataCollatorForLanguageModeling(
+        tokenizer=tokenizer,
+        mlm_probability=config["mlm_probability"],
     )
 
     train_loader = DataLoader(
