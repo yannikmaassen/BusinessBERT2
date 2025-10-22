@@ -151,7 +151,6 @@ def main():
         taxonomy_maps=taxonomy_maps,
         total_steps=total_steps,
     )
-    exit(0)
 
     # Train
     trainer.train()
