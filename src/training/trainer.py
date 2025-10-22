@@ -60,7 +60,6 @@ class MultiTaskTrainer(Trainer):
             logs["w_ic4"] = float(self.model.loss_weights.get("ic4", 0))
             logs["w_consistency"] = float(self.model.loss_weights.get("consistency", 0))
 
-        # Add individual task losses and accuracies if available
         if hasattr(self, '_last_outputs') and self._last_outputs:
             outputs = self._last_outputs
             losses = outputs["losses"]
@@ -68,17 +67,17 @@ class MultiTaskTrainer(Trainer):
 
             # Individual losses
             if "mlm" in losses:
-                logs[f"{prefix}loss_mlm"] = float(outputs["mlm"])
+                logs[f"{prefix}loss_mlm"] = float(losses["mlm"])
             if "sop" in losses:
-                logs[f"{prefix}loss_sop"] = float(outputs["sop"])
+                logs[f"{prefix}loss_sop"] = float(losses["sop"])
             if "ic2" in losses:
-                logs[f"{prefix}loss_ic2"] = float(outputs["ic2"])
+                logs[f"{prefix}loss_ic2"] = float(losses["ic2"])
             if "ic3" in losses:
-                logs[f"{prefix}loss_ic3"] = float(outputs["ic3"])
+                logs[f"{prefix}loss_ic3"] = float(losses["ic3"])
             if "ic4" in losses:
-                logs[f"{prefix}loss_ic4"] = float(outputs["ic4"])
+                logs[f"{prefix}loss_ic4"] = float(losses["ic4"])
             if "consistency" in losses:
-                logs[f"{prefix}loss_consistency"] = float(outputs["consistency"])
+                logs[f"{prefix}loss_consistency"] = float(losses["consistency"])
 
             # Accuracies
             # if "acc_sop" in outputs:
