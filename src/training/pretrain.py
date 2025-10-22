@@ -56,6 +56,11 @@ def main():
     # ---------------- Data ----------------
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
+    print("First 10 lines:")
+    for row in dataset[:10]:
+        print(row)
+
+    print("################################################################################")
 
     print("Splitting train/validation...")
     train_rows, val_rows = train_test_split(
@@ -70,6 +75,20 @@ def main():
     train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
     val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
 
+    print("First 3 train examples:")
+    for ex in train_examples[:3]:
+        print(f"Sentences: {ex.sentences}")
+        print(f"SIC2: {ex.sic2}, SIC3: {ex.sic3}, SIC4: {ex.sic4}")
+
+    print("################################################################################")
+
+    print("First 3 val examples:")
+    for ex in val_examples[:3]:
+        print(f"Sentences: {ex.sentences}")
+        print(f"SIC2: {ex.sic2}, SIC3: {ex.sic3}, SIC4: {ex.sic4}")
+
+    print("################################################################################")
+
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
@@ -83,9 +102,23 @@ def main():
         f"4-digit={len(taxonomy_maps['sic4_list'])}"
     )
 
+    print("Taxonomy mappings samples:")
+    print("SIC2:", list(taxonomy_maps["idx2"].items())[:5])
+    print("SIC3:", list(taxonomy_maps["idx3"].items())[:5])
+    print("SIC4:", list(taxonomy_maps["idx4"].items())[:5])
+
+    print("################################################################################")
+
     print("Tokenizing datasets...")
     train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
+
+    print("Show first train sample:")
+    first_sample = train_dataset[0]
+    for k, v in first_sample.items():
+        print(f"{k}: {v}")
+
+    print("################################################################################")
 
     collate = Collator(
         tokenizer=tokenizer
@@ -144,6 +177,7 @@ def main():
         taxonomy_maps=taxonomy_maps,
         total_steps=total_steps,
     )
+    exit(0)
 
     # Train
     trainer.train()
