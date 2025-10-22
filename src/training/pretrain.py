@@ -95,9 +95,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
 
-    precision = str(config.get("precision", "fp32")).lower()
-    device_has_cuda = torch.cuda.is_available()
-
     model = BusinessBERT2Pretrain(
         config=bert_config,
         n_sic2_classes=len(taxonomy_maps["sic2_list"]),
@@ -111,15 +108,6 @@ def main():
 
     if use_wandb and wandb is not None and config.get("wandb_watch", True):
         wandb.watch(model, log="gradients", log_freq=max(1, int(config.get("logging_steps", 50))))
-
-    use_amp = device_has_cuda and precision in {"fp16", "bf16"}
-    amp_kwargs = {}
-
-    if device_has_cuda:
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
-
-    print(f"[INIT] precision={precision}, use_amp={use_amp}, amp_dtype={amp_kwargs.get('dtype', 'fp32')}")
 
     # Calculate total steps
     steps_per_epoch = len(train_dataset) // config["train_batch_size"]
