@@ -546,6 +546,7 @@ def main():
         report_to="wandb" if config.get("report_to") == "wandb" else "none",
         gradient_accumulation_steps=1,
         max_grad_norm=config.get("grad_clip", 1.0),
+        save_safetensors=False,
     )
 
     # Initialize trainer
