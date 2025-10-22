@@ -38,7 +38,7 @@ test:
 
 # ====== Colab / any pre-provisioned env (no venv) ======
 install-colab:
-	$(PIP) -q install --no-cache-dir -r requirements.txt
+	$(PIP) -q install --no-cache-dir -r --force-reinstall requirements.txt
 
 train-colab:
 	$(PY) -m src.training.pretrain --config $(CONFIG)
