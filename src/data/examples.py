@@ -18,7 +18,12 @@ class PretrainExample:
 def make_examples(rows: List[dict], field_sentences: str, field_sic2: str, field_sic3: str, field_sic4: str):
     examples: List[PretrainExample] = []
     for row in rows:
-        sentences = str(row.get(field_sentences, "")).strip()
+        sentences_list = row.get(field_sentences, [])
+        if not isinstance(sentences_list, list) or len(sentences_list) == 0:
+            continue
+
+        # Join all sentences into one text for MLM
+        sentences = ' '.join(sentences_list)
         # if not isinstance(sentences, list) or len(sentences) == 0:
         #     continue
         # sentence_a = sentences[0]
