@@ -103,9 +103,8 @@ def main():
     )
 
     print("Taxonomy mappings samples:")
-    print("SIC2:", list(taxonomy_maps["idx2"].items())[:5])
-    print("SIC3:", list(taxonomy_maps["idx3"].items())[:5])
-    print("SIC4:", list(taxonomy_maps["idx4"].items())[:5])
+    print("A32:", list(taxonomy_maps["A32"].items())[:30])
+    print("A43:", list(taxonomy_maps["A43"].items())[:30])
 
     print("################################################################################")
 
