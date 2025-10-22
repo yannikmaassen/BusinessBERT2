@@ -23,11 +23,13 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def load_config(path: str, data_override: str = None) -> Dict:
+def load_config(path: str, data_override: str = None, report_to: str = None) -> Dict:
     with open(path, "r") as file:
         config = yaml.safe_load(file)
     if data_override:
         config["jsonl_path"] = data_override
+    if report_to:
+        config["report_to"] = report_to
     return config
 
 
@@ -35,7 +37,7 @@ def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
 
-    config = load_config(args.config, args.data)
+    config = load_config(args.config, args.data, args.report_to)
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(int(config.get("seed", 42)))
@@ -56,11 +58,6 @@ def main():
     # ---------------- Data ----------------
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
-    print("First 10 lines:")
-    for row in dataset[:10]:
-        print(row)
-
-    print("################################################################################")
 
     print("Splitting train/validation...")
     train_rows, val_rows = train_test_split(
@@ -71,23 +68,9 @@ def main():
     )
 
     # Create examples (sentence pairs with SOP labels and SIC labels)
-    print("Creating train/val examples...")
-    train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
-    val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
-
-    print("First 3 train examples:")
-    for ex in train_examples[:3]:
-        print(f"Sentences: {ex.sentences}")
-        print(f"SIC2: {ex.sic2}, SIC3: {ex.sic3}, SIC4: {ex.sic4}")
-
-    print("################################################################################")
-
-    print("First 3 val examples:")
-    for ex in val_examples[:3]:
-        print(f"Sentences: {ex.sentences}")
-        print(f"SIC2: {ex.sic2}, SIC3: {ex.sic3}, SIC4: {ex.sic4}")
-
-    print("################################################################################")
+    # print("Creating train/val examples...")
+    # train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
+    # val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
 
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
     if tokenizer.pad_token is None:
@@ -102,22 +85,14 @@ def main():
         f"4-digit={len(taxonomy_maps['sic4_list'])}"
     )
 
-    print("Taxonomy mappings samples:")
-    print("A32:", list(taxonomy_maps["A32"].items())[:30])
-    print("A43:", list(taxonomy_maps["A43"].items())[:30])
-
-    print("################################################################################")
-
     print("Tokenizing datasets...")
-    train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
-    val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
+    train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], nsp_probability=config["nsp_probability"])
+    val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], nsp_probability=config["nsp_probability"])
 
     print("Show first train sample:")
-    first_sample = train_dataset[0]
+    first_sample = train_dataset[5]
     for k, v in first_sample.items():
         print(f"{k}: {v}")
-
-    print("################################################################################")
 
     collate = Collator(
         tokenizer=tokenizer

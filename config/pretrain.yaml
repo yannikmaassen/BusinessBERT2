@@ -29,6 +29,9 @@ mlm_probability: 0.15
 random_token_probability: 0.10
 keep_token_probability: 0.10
 
+# NSP params
+nsp_probability: 0.5
+
 # Loss weights
 loss_weights:
   mlm: 2.0  # Increased to emphasize MLM learning
