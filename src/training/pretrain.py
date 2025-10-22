@@ -539,7 +539,7 @@ def main():
         weight_decay=config["weight_decay"],
         logging_steps=config["logging_steps"],
         save_strategy="epoch",
-        evaluation_strategy="epoch",
+        eval_strategy="epoch",
         fp16=config.get("precision") == "fp16",
         bf16=config.get("precision") == "bf16",
         dataloader_num_workers=config["num_workers"],
