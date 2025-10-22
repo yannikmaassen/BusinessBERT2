@@ -83,6 +83,7 @@ def main():
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
 
+    print("Building taxonomy maps...")
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
     print(
         f"SIC sizes: "
@@ -91,6 +92,7 @@ def main():
         f"4-digit={len(taxonomy_maps['sic4_list'])}"
     )
 
+    print("Splitting train/validation...")
     train_rows, val_rows = train_test_split(
         dataset,
         test_size=config["val_ratio"],
@@ -99,6 +101,7 @@ def main():
     )
 
     # Create examples (sentence pairs with SOP labels and SIC labels)
+    print("Creating train/val examples...")
     train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
     val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
 
@@ -106,6 +109,7 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
 
+    print("Tokenizing datasets...")
     train_dataset = PretrainDataset(train_examples, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_examples,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
