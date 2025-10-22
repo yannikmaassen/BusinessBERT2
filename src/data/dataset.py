@@ -26,11 +26,11 @@ class PretrainDataset(Dataset):
     def __len__(self):
         return len(self.raw_examples)
 
-    def _map_sic_code(self, sic_value: Optional[str]) -> int:
+    def _map_sic_code(self, sic_value: Optional[str], sic_to_idx: Dict[str, int]) -> int:
         """Map SIC code to index, handling None and 'NA' values."""
         if sic_value is None or sic_value == "NA" or sic_value == "":
             return -100
-        return int(sic_value)
+        return sic_to_idx.get(str(sic_value), -100)
 
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.raw_examples[idx]
@@ -77,9 +77,9 @@ class PretrainDataset(Dataset):
         )
 
         # Map SIC codes
-        sic2 = self._map_sic_code(example["sic2"])
-        sic3 = self._map_sic_code(example.get("sic3"))
-        sic4 = self._map_sic_code(example.get("sic4"))
+        sic2 = self._map_sic_code(example.get("sic2"), self.idx2)
+        sic3 = self._map_sic_code(example.get("sic3"), self.idx3)
+        sic4 = self._map_sic_code(example.get("sic4"), self.idx4)
 
         return {
             "input_ids": encoding["input_ids"],
