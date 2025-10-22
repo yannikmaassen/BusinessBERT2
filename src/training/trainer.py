@@ -31,6 +31,10 @@ class MultiTaskTrainer(Trainer):
         outputs = model(**inputs)
         loss = outputs["loss"]
 
+        # Store individual losses and accuracies for logging
+        if not self.model.training:  # During evaluation
+            self._last_outputs = outputs
+
         return (loss, outputs) if return_outputs else loss
 
     @staticmethod
@@ -56,6 +60,47 @@ class MultiTaskTrainer(Trainer):
             logs["w_ic4"] = float(self.model.loss_weights.get("ic4", 0))
             logs["w_consistency"] = float(self.model.loss_weights.get("consistency", 0))
 
+        # Add individual task losses and accuracies if available
+        if hasattr(self, '_last_outputs') and self._last_outputs:
+            outputs = self._last_outputs
+            losses = outputs["losses"]
+            prefix = "eval_" if "eval_loss" in logs else ""
+
+            # Individual losses
+            if "mlm" in losses:
+                logs[f"{prefix}loss_mlm"] = float(outputs["mlm"])
+            if "sop" in losses:
+                logs[f"{prefix}loss_sop"] = float(outputs["sop"])
+            if "ic2" in losses:
+                logs[f"{prefix}loss_ic2"] = float(outputs["ic2"])
+            if "ic3" in losses:
+                logs[f"{prefix}loss_ic3"] = float(outputs["ic3"])
+            if "ic4" in losses:
+                logs[f"{prefix}loss_ic4"] = float(outputs["ic4"])
+            if "consistency" in losses:
+                logs[f"{prefix}loss_consistency"] = float(outputs["consistency"])
+
+            # Accuracies
+            # if "acc_sop" in outputs:
+            #     logs[f"{prefix}acc_sop"] = float(outputs["acc_sop"])
+            # if "acc_ic2" in outputs:
+            #     logs[f"{prefix}acc_ic2"] = float(outputs["acc_ic2"])
+            # if "acc_ic3" in outputs:
+            #     logs[f"{prefix}acc_ic3"] = float(outputs["acc_ic3"])
+            # if "acc_ic4" in outputs:
+            #     logs[f"{prefix}acc_ic4"] = float(outputs["acc_ic4"])
+
         # Call parent's log with all arguments
         super().log(logs, *args, **kwargs)
 
+    def evaluation_loop(self, dataloader, description, prediction_loss_only=None, ignore_keys=None,
+                        metric_key_prefix="eval"):
+        """Override to aggregate metrics across evaluation batches"""
+        # Call parent evaluation
+        output = super().evaluation_loop(
+            dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix
+        )
+
+        # Extract aggregated metrics from the last batch
+        # Note: The parent class already handles metric aggregation
+        return output
