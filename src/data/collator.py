@@ -19,7 +19,11 @@ class Collator:
 
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         # Pull out your custom labels first (so the MLM collator ignores them)
-        extra_keys = ["sop_label", "sic2", "sic3", "sic4"]
+        extra_keys = [
+            # "sop_label",
+            "sic2", "sic3", "sic4"
+        ]
+
         extras = {k: torch.tensor([f[k] for f in features], dtype=torch.long)
                   for k in extra_keys if k in features[0]}
 
@@ -31,8 +35,8 @@ class Collator:
 
         # Rename to match your expected output
         batch["mlm_labels"] = batch.pop("labels")
-        if "sop_label" in extras:
-            batch["sop_labels"] = extras["sop_label"]
+        # if "sop_label" in extras:
+        #     batch["sop_labels"] = extras["sop_label"]
         for k in ["sic2", "sic3", "sic4"]:
             if k in extras:
                 batch[k] = extras[k]

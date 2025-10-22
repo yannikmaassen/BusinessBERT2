@@ -21,12 +21,13 @@ class BertPretrainHeads(torch.nn.Module):
 
         # Tied weights between embedding and output layer (standard practice)
         self.mlm_decoder.weight = embedding_weights.weight
-        self.sop_classifier = torch.nn.Linear(config.hidden_size, 2)
+        # self.sop_classifier = torch.nn.Linear(config.hidden_size, 2)
 
 
     def forward(self, sequence_output, pooled_output):
         mlm_hidden = self.transform(sequence_output)
         mlm_logits = self.mlm_decoder(mlm_hidden) + self.mlm_bias
-        sop_logits = self.sop_classifier(pooled_output)
+        # sop_logits = self.sop_classifier(pooled_output)
 
-        return mlm_logits, sop_logits
+        return mlm_logits
+        # return mlm_logits, sop_logits

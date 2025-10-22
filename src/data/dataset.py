@@ -19,8 +19,7 @@ class PretrainDataset(Dataset):
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.examples[idx]
         encoding = self.tokenizer(
-            example.sentence_a if example.sentence_a else "",
-            example.sentence_b if example.sentence_b else None,
+            example["sentences"],
             truncation=True,
             max_length=self.max_length,
             padding=False,
@@ -34,7 +33,7 @@ class PretrainDataset(Dataset):
             "input_ids": encoding["input_ids"],
             "token_type_ids": encoding.get("token_type_ids", [0] * len(encoding["input_ids"])),
             "attention_mask": encoding["attention_mask"],
-            "sop_label": example.sop_label,
+            # "sop_label": example.sop_label,
             "sic2": sic2,
             "sic3": sic3,
             "sic4": sic4,
