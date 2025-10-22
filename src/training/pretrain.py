@@ -89,11 +89,6 @@ def main():
     train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], nsp_probability=config["nsp_probability"])
     val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], nsp_probability=config["nsp_probability"])
 
-    print("Show first train sample:")
-    first_sample = train_dataset[5]
-    for k, v in first_sample.items():
-        print(f"{k}: {v}")
-
     collate = Collator(
         tokenizer=tokenizer
     )

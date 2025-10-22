@@ -81,16 +81,6 @@ class PretrainDataset(Dataset):
         sic3 = self._map_sic_code(example.get("sic3"))
         sic4 = self._map_sic_code(example.get("sic4"))
 
-        print({
-            "input_ids": encoding["input_ids"],
-            "token_type_ids": encoding["token_type_ids"],
-            "attention_mask": encoding["attention_mask"],
-            "nsp_label": nsp_label,
-            "sic2": sic2,
-            "sic3": sic3,
-            "sic4": sic4,
-        })
-
         return {
             "input_ids": encoding["input_ids"],
             "token_type_ids": encoding["token_type_ids"],
