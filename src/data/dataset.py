@@ -19,7 +19,7 @@ class PretrainDataset(Dataset):
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.examples[idx]
         encoding = self.tokenizer(
-            example["sentences"],
+            example.sentences,
             truncation=True,
             max_length=self.max_length,
             padding=False,
