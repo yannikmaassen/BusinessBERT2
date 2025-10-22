@@ -47,7 +47,7 @@ class MultiTaskTrainer(Trainer):
         total = w2 + w3 + w4
         return w2 / total, w3 / total, w4 / total
 
-    def log(self, logs):
+    def log(self, logs, *args, **kwargs):
         """Add custom metrics to logging"""
         # Add current loss weights
         if hasattr(self.model, 'loss_weights'):
@@ -56,4 +56,6 @@ class MultiTaskTrainer(Trainer):
             logs["w_ic4"] = float(self.model.loss_weights.get("ic4", 0))
             logs["w_consistency"] = float(self.model.loss_weights.get("consistency", 0))
 
-        super().log(logs)
+        # Call parent's log with all arguments
+        super().log(logs, *args, **kwargs)
+
