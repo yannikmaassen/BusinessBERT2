@@ -19,7 +19,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
     """
     BERT encoder with:
       - MLM (token-level)
-      - SOP (binary)
+      - NSP (binary)
       - IC hierarchical (SIC2/3/4) + upward consistency (SIC4→SIC3 and SIC4→SIC2 via KL)
         * Multi-level cross-entropy at SIC2, SIC3, SIC4
         * Consistency encourages ancestor heads (SIC2/SIC3) to match leaf-implied marginals from SIC4
@@ -79,7 +79,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         attention_mask=None,
         token_type_ids=None,
         mlm_labels: Optional[torch.Tensor] = None,
-        # sop_labels: Optional[torch.Tensor] = None,
+        nsp_labels: Optional[torch.Tensor] = None,
         sic2: Optional[torch.Tensor] = None,
         sic3: Optional[torch.Tensor] = None,
         sic4: Optional[torch.Tensor] = None,
@@ -93,8 +93,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         sequence_output = transformer_outputs.last_hidden_state
         pooled_output = self.dropout(transformer_outputs.pooler_output)
 
-        mlm_logits = self.heads(sequence_output, pooled_output)
-        # mlm_logits, sop_logits = self.heads(sequence_output, pooled_output)
+        mlm_logits, nsp_logits = self.heads(sequence_output, pooled_output)
 
         sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None  # [batch, n2]
         sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None  # [batch, n3]
@@ -109,11 +108,11 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             losses["mlm"] = mlm_loss
             total_loss = total_loss + self.loss_weights.get("mlm", 1.0) * mlm_loss
 
-        # ----- SOP -----
-        # if sop_labels is not None:
-        #     sop_loss = self.ce(sop_logits, sop_labels)
-        #     losses["sop"] = sop_loss
-        #     total_loss = total_loss + self.loss_weights.get("sop", 1.0) * sop_loss
+        # ----- NSP -----
+        if nsp_labels is not None:
+            nsp_loss = self.ce(nsp_logits, nsp_labels)
+            losses["nsp"] = nsp_loss
+            total_loss = total_loss + self.loss_weights.get("nsp", 1.0) * nsp_loss
 
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
@@ -162,7 +161,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             "loss": total_loss,
             "losses": losses,
             "mlm_logits": mlm_logits,
-            # "sop_logits": sop_logits,
+            "nsp_logits": nsp_logits,
             "ic2_logits": sic2_logits,
             "ic3_logits": sic3_logits,
             "ic4_logits": sic4_logits,
