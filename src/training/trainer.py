@@ -1,5 +1,5 @@
 from transformers import Trainer
-import torch
+import wandb
 
 
 class MultiTaskTrainer(Trainer):
@@ -34,6 +34,22 @@ class MultiTaskTrainer(Trainer):
         # Store individual losses and accuracies for logging
         if not self.model.training:  # During evaluation
             self._last_outputs = outputs
+
+        # Log individual losses to WandB (only during training)
+        if self.state.global_step > 0 and self.args.report_to and "wandb" in self.args.report_to:
+            # Extract individual loss components
+            loss_dict = outputs.get("losses", {})
+
+            # Prepare logging dict with proper names
+            log_dict = {"train/loss_total": loss.item()}
+            for key, value in loss_dict.items():
+                log_dict[f"train/loss_{key}"] = value.item()
+
+            # Add global_step for proper x-axis alignment
+            log_dict["global_step"] = self.state.global_step
+
+            # Log to WandB
+            wandb.log(log_dict)
 
         return (loss, outputs) if return_outputs else loss
 
