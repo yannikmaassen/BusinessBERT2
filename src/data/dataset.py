@@ -34,7 +34,8 @@ class PretrainDataset(Dataset):
 
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.raw_examples[idx]
-        sentences = example["sentences"]
+        raw_sentences = example["sentences"]
+        sentences = ' '.join(raw_sentences)
 
         # if len(sentences) == 0:
         #     sentences = [""]
