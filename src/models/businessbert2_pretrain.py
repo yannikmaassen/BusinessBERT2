@@ -2,8 +2,7 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertConfig, BertModel, BertPreTrainedModel
-from src.models.heads import BertPretrainHeads
+from transformers import BertConfig, BertPreTrainedModel, BertForPreTraining
 
 
 def _kl_div(p_log, q, eps: float = 1e-8):
@@ -36,8 +35,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         loss_weights: Dict[str, float],
     ):
         super().__init__(config)
-        self.bert = BertModel(config)
-        self.heads = BertPretrainHeads(config, self.bert.get_input_embeddings())
+        self.bert = BertForPreTraining(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
@@ -61,12 +59,8 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.register_buffer("M42", M42)  # [|SIC4| x |SIC2|]
 
         # Register child-to-parent matrices as buffers (non-trainable)
-        self.register_buffer(
-            "child_to_parent_matrix_sic4_to_sic3", M43
-        )
-        self.register_buffer(
-            "child_to_parent_matrix_sic4_to_sic2", M42
-        )
+        self.register_buffer("child_to_parent_matrix_sic4_to_sic3", M43)
+        self.register_buffer("child_to_parent_matrix_sic4_to_sic2", M42)
 
         self.loss_weights = dict(loss_weights)
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
@@ -84,7 +78,8 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         sic3: Optional[torch.Tensor] = None,
         sic4: Optional[torch.Tensor] = None,
     ):
-        transformer_outputs = self.bert(
+        base_model = self.bert.bert
+        transformer_outputs = base_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -93,7 +88,10 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         sequence_output = transformer_outputs.last_hidden_state
         pooled_output = self.dropout(transformer_outputs.pooler_output)
 
-        mlm_logits, nsp_logits = self.heads(sequence_output, pooled_output)
+        # Extract MLM logits using built-in prediction head
+        mlm_logits = self.bert.cls.predictions(sequence_output)
+        # Extract NSP logits using built-in seq_relationship head
+        nsp_logits = self.bert.cls.seq_relationship(pooled_output)
 
         sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None  # [batch, n2]
         sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None  # [batch, n3]
