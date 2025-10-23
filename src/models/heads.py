@@ -13,21 +13,14 @@ class BertPretrainHeads(torch.nn.Module):
         )
         self.mlm_decoder = torch.nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-        # Better bias initialization: slightly positive for common tokens
-        # Initialize with small positive values scaled by vocab size
-        # This helps the model start predicting common tokens earlier in training
         init_value = 1.0 / math.sqrt(config.vocab_size)
         self.mlm_bias = torch.nn.Parameter(torch.ones(config.vocab_size) * init_value)
-
-        # Tied weights between embedding and output layer (standard practice)
         self.mlm_decoder.weight = embedding_weights.weight
-        # self.sop_classifier = torch.nn.Linear(config.hidden_size, 2)
-
+        self.nsp_classifier = torch.nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
         mlm_hidden = self.transform(sequence_output)
         mlm_logits = self.mlm_decoder(mlm_hidden) + self.mlm_bias
-        # sop_logits = self.sop_classifier(pooled_output)
+        nsp_logits = self.nsp_classifier(pooled_output)
 
-        return mlm_logits
-        # return mlm_logits, sop_logits
+        return mlm_logits, nsp_logits

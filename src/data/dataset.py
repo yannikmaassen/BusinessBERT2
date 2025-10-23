@@ -85,7 +85,7 @@ class PretrainDataset(Dataset):
             "input_ids": encoding["input_ids"],
             "token_type_ids": encoding["token_type_ids"],
             "attention_mask": encoding["attention_mask"],
-            # "nsp_label": nsp_label,
+            "nsp_label": nsp_label,
             "sic2": sic2,
             "sic3": sic3,
             "sic4": sic4,
