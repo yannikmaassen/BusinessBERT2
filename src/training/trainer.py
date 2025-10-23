@@ -84,8 +84,8 @@ class MultiTaskTrainer(Trainer):
             # Individual losses
             if "mlm" in losses:
                 logs[f"{prefix}loss_mlm"] = float(losses["mlm"])
-            if "sop" in losses:
-                logs[f"{prefix}loss_sop"] = float(losses["sop"])
+            if "nsp" in losses:
+                logs[f"{prefix}loss_nsp"] = float(losses["nsp"])
             if "ic2" in losses:
                 logs[f"{prefix}loss_ic2"] = float(losses["ic2"])
             if "ic3" in losses:
@@ -117,5 +117,4 @@ class MultiTaskTrainer(Trainer):
         )
 
         # Extract aggregated metrics from the last batch
-        # Note: The parent class already handles metric aggregation
         return output
