@@ -36,40 +36,39 @@ class PretrainDataset(Dataset):
         example = self.raw_examples[idx]
         sentences = example["sentences"]
 
-        if len(sentences) == 0:
-            sentences = [""]
-
-        # Split document roughly in half to create two segments
-        # Each segment contains multiple consecutive sentences
-        split_point = len(sentences) // 2
-        if split_point == 0:
-            split_point = 1
-
-        # Segment A: first half of document
-        segment_a_sentences = sentences[:split_point]
-
-        # NSP logic
-        if random.random() < self.nsp_probability:
-            # Segment B: random sentences from different document (label = 1)
-            random_idx = random.randint(0, len(self.raw_examples) - 1)
-            random_sentences = self.raw_examples[random_idx]["sentences"]
-            # Take some sentences from random document
-            num_sentences = min(len(random_sentences), split_point)
-            segment_b_sentences = random_sentences[:num_sentences] if num_sentences > 0 else [""]
-            nsp_label = 1
-        else:
-            # Segment B: second half of same document (label = 0)
-            segment_b_sentences = sentences[split_point:] if split_point < len(sentences) else [""]
-            nsp_label = 0
-
-        # Join sentences into two text segments
-        segment_a = " ".join(segment_a_sentences)
-        segment_b = " ".join(segment_b_sentences)
+        # if len(sentences) == 0:
+        #     sentences = [""]
+        #
+        # # Split document roughly in half to create two segments
+        # # Each segment contains multiple consecutive sentences
+        # split_point = len(sentences) // 2
+        # if split_point == 0:
+        #     split_point = 1
+        #
+        # # Segment A: first half of document
+        # segment_a_sentences = sentences[:split_point]
+        #
+        # # NSP logic
+        # if random.random() < self.nsp_probability:
+        #     # Segment B: random sentences from different document (label = 1)
+        #     random_idx = random.randint(0, len(self.raw_examples) - 1)
+        #     random_sentences = self.raw_examples[random_idx]["sentences"]
+        #     # Take some sentences from random document
+        #     num_sentences = min(len(random_sentences), split_point)
+        #     segment_b_sentences = random_sentences[:num_sentences] if num_sentences > 0 else [""]
+        #     nsp_label = 1
+        # else:
+        #     # Segment B: second half of same document (label = 0)
+        #     segment_b_sentences = sentences[split_point:] if split_point < len(sentences) else [""]
+        #     nsp_label = 0
+        #
+        # # Join sentences into two text segments
+        # segment_a = " ".join(segment_a_sentences)
+        # segment_b = " ".join(segment_b_sentences)
 
         # Tokenize the pair
         encoding = self.tokenizer(
-            segment_a,
-            segment_b,
+            sentences,
             truncation=True,
             max_length=self.max_length,
             padding=False,
@@ -85,7 +84,7 @@ class PretrainDataset(Dataset):
             "input_ids": encoding["input_ids"],
             "token_type_ids": encoding["token_type_ids"],
             "attention_mask": encoding["attention_mask"],
-            "nsp_label": nsp_label,
+            "nsp_label": 0,
             "sic2": sic2,
             "sic3": sic3,
             "sic4": sic4,
