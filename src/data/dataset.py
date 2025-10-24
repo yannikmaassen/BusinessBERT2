@@ -102,7 +102,7 @@ class PretrainDataset(Dataset):
             # example["segment_b"],
             truncation=True,
             max_length=self.max_length,
-            padding="max_length",
+            padding=True,
             return_tensors=None,
         )
 
