@@ -97,7 +97,7 @@ class PretrainDataset(Dataset):
 
         # Fast tokenization only
         encoding = self.tokenizer(
-            sentences=example["sentences"],
+            example["sentences"],
             # example["segment_a"],
             # example["segment_b"],
             truncation=True,
