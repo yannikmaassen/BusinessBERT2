@@ -72,7 +72,7 @@ class PretrainDataset(Dataset):
             sentences,
             truncation=True,
             max_length=self.max_length,
-            padding=False,
+            padding="max_length",
             return_tensors=None,
         )
 
