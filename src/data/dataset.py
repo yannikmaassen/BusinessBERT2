@@ -70,10 +70,23 @@ class PretrainDataset(Dataset):
                 segment_b_sentences = sentences[split_point:] if split_point < len(sentences) else [sentences[-1]]
                 nsp_label = 0
 
-            # Join and store
+            # Tokenize immediately
+            segment_a = " ".join(segment_a_sentences)
+            segment_b = " ".join(segment_b_sentences)
+
+            encoding = self.tokenizer(
+                segment_a,
+                segment_b,
+                truncation=True,
+                max_length=self.max_length,
+                padding=False,  # Don't pad during preprocessing
+                return_tensors=None,
+            )
+
             processed.append({
-                "segment_a": " ".join(segment_a_sentences),
-                "segment_b": " ".join(segment_b_sentences),
+                "input_ids": encoding["input_ids"],
+                "token_type_ids": encoding["token_type_ids"],
+                "attention_mask": encoding["attention_mask"],
                 "nsp_label": nsp_label,
                 "sic2": example.get("sic2"),
                 "sic3": example.get("sic3"),
@@ -82,37 +95,18 @@ class PretrainDataset(Dataset):
 
         return processed
 
-    def __len__(self):
-        return len(self.examples)
-
-    def _map_sic_code(self, sic_value: Optional[str], sic_to_idx: Dict[str, int]) -> int:
-        """Map SIC code to index, handling None and 'NA' values."""
-        if sic_value is None or sic_value == "NA" or sic_value == "":
-            return -100
-        return sic_to_idx.get(str(sic_value), -100)
-
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.examples[idx]
 
-        # Fast tokenization only
-        encoding = self.tokenizer(
-            example["segment_a"],
-            example["segment_b"],
-            truncation=True,
-            max_length=self.max_length,
-            padding=False,
-            return_tensors=None,
-        )
-
-        # Map SIC codes
+        # Map SIC codes (very fast)
         sic2 = self._map_sic_code(example["sic2"], self.idx2)
         sic3 = self._map_sic_code(example["sic3"], self.idx3)
         sic4 = self._map_sic_code(example["sic4"], self.idx4)
 
         return {
-            "input_ids": encoding["input_ids"],
-            "token_type_ids": encoding["token_type_ids"],
-            "attention_mask": encoding["attention_mask"],
+            "input_ids": example["input_ids"],
+            "token_type_ids": example["token_type_ids"],
+            "attention_mask": example["attention_mask"],
             "nsp_label": example["nsp_label"],
             "sic2": sic2,
             "sic3": sic3,
