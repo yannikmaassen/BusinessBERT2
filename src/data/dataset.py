@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional, Tuple
 import random
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
+from tqdm import tqdm
 
 
 class PretrainDataset(Dataset):
@@ -25,6 +26,7 @@ class PretrainDataset(Dataset):
         self.examples = self._preprocess_examples(raw_examples, nsp_probability)
         print(f"Created {len(self.examples)} training examples")
 
+
     def _preprocess_examples(
             self,
             raw_examples: List[Dict[str, Any]],
@@ -39,7 +41,9 @@ class PretrainDataset(Dataset):
             if ex.get("sentences") and len(ex["sentences"]) > 0
         ]
 
-        for idx, example in enumerate(raw_examples):
+        print(f"Found {len(valid_indices)} valid documents out of {len(raw_examples)}")
+
+        for idx, example in enumerate(tqdm(raw_examples, desc="Preprocessing examples")):
             sentences = example.get("sentences", [])
 
             if not sentences:
@@ -79,7 +83,7 @@ class PretrainDataset(Dataset):
                 segment_b,
                 truncation=True,
                 max_length=self.max_length,
-                padding=False,  # Don't pad during preprocessing
+                padding=False,
                 return_tensors=None,
             )
 
