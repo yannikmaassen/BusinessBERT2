@@ -140,7 +140,6 @@ def main():
     trainer = MultiTaskTrainer(
         model=model,
         args=training_args,
-        tokenizer=tokenizer,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         data_collator=collate,

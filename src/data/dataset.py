@@ -72,8 +72,9 @@ class PretrainDataset(Dataset):
 
             # Join and store
             processed.append({
-                "segment_a": " ".join(segment_a_sentences),
-                "segment_b": " ".join(segment_b_sentences),
+                "sentence": sentences[0],
+                # "segment_a": " ".join(segment_a_sentences),
+                # "segment_b": " ".join(segment_b_sentences),
                 "nsp_label": nsp_label,
                 "sic2": example.get("sic2"),
                 "sic3": example.get("sic3"),
@@ -96,8 +97,9 @@ class PretrainDataset(Dataset):
 
         # Fast tokenization only
         encoding = self.tokenizer(
-            example["segment_a"],
-            example["segment_b"],
+            example["sentence"],
+            # example["segment_a"],
+            # example["segment_b"],
             truncation=True,
             max_length=self.max_length,
             padding="max_length",
