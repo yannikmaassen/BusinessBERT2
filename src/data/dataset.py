@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
 from tqdm import tqdm
@@ -72,10 +72,11 @@ class PretrainDataset(Dataset):
         return processed
 
 
-    def _map_sic_code(self, code: Any, mapping: Dict[str, int]) -> int:
-        if code is None:
-            return -1
-        return mapping.get(str(code), -1)
+    def _map_sic_code(self, sic_value: Optional[str], sic_to_idx: Dict[str, int]) -> int:
+        """Map SIC code to index, handling None and 'NA' values."""
+        if sic_value is None or sic_value == "NA" or sic_value == "":
+            return -100
+        return sic_to_idx.get(str(sic_value), -100)
 
 
     def __len__(self) -> int:
