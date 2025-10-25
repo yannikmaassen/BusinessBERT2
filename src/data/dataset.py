@@ -70,7 +70,7 @@ class PretrainDataset(Dataset):
                 })
             else:
                 # Split into overlapping chunks
-                stride = self.max_length // 20
+                stride = int(self.max_length * 0.95)
                 for i in range(0, len(encoding["input_ids"]), stride):
                     chunk_ids = encoding["input_ids"][i:i + self.max_length]
                     chunk_mask = encoding["attention_mask"][i:i + self.max_length]
