@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional
 from torch.utils.data import Dataset
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizer
 from tqdm import tqdm
 
 
@@ -8,7 +8,7 @@ class PretrainDataset(Dataset):
     def __init__(
             self,
             raw_examples: List[Dict[str, Any]],
-            tokenizer: PreTrainedTokenizerBase,
+            tokenizer: PreTrainedTokenizer,
             max_length: int,
             indexed_sic2_list: Dict[str, int],
             indexed_sic3_list: Dict[str, int],
@@ -54,6 +54,7 @@ class PretrainDataset(Dataset):
                 truncation=False,
                 padding=False,
                 return_tensors=None,
+                return_special_tokens_mask=True,
             )
 
             # If within max_length, process normally

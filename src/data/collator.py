@@ -32,8 +32,7 @@ class Collator:
 
         # Rename to match expected output
         batch["mlm_labels"] = batch.pop("labels")
-        if "nsp_label" in extras:
-             batch["nsp_labels"] = extras["nsp_label"]
+
         for k in ["sic2", "sic3", "sic4"]:
             if k in extras:
                 batch[k] = extras[k]
