@@ -21,7 +21,7 @@ class PretrainDataset(Dataset):
         self.idx4 = idx4
 
         print("Preprocessing examples...")
-        self.examples = self._preprocess_examples(raw_examples)
+        self.examples = self._preprocess_examples(raw_examples[0:2])
         print(f"Created {len(self.examples)} training examples")
 
 
