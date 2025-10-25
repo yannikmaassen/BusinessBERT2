@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, BertConfig, TrainingArguments
 
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
-from src.data import make_examples, PretrainDataset, Collator
+from src.data import PretrainDataset, Collator
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
