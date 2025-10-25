@@ -41,7 +41,7 @@ class PretrainDataset(Dataset):
             self,
             raw_examples: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Preprocess all examples - document level for MLM + IC."""
+        """Preprocess all examples - document level for MLM + IC with chunking."""
         processed = []
 
         for example in tqdm(raw_examples, desc="Preprocessing examples"):
@@ -50,24 +50,41 @@ class PretrainDataset(Dataset):
             if not sentences:
                 continue
 
-            # Full document as single segment
             full_text = " ".join(sentences)
 
             encoding = self.tokenizer(
                 full_text,
-                truncation=True,
-                max_length=self.max_length,
+                truncation=False,
                 padding=False,
                 return_tensors=None,
             )
 
-            processed.append({
-                "input_ids": encoding["input_ids"],
-                "attention_mask": encoding["attention_mask"],
-                "sic2": example.get("sic2"),
-                "sic3": example.get("sic3"),
-                "sic4": example.get("sic4"),
-            })
+            # If within max_length, process normally
+            if len(encoding["input_ids"]) <= self.max_length:
+                processed.append({
+                    "input_ids": encoding["input_ids"],
+                    "attention_mask": encoding["attention_mask"],
+                    "sic2": example.get("sic2"),
+                    "sic3": example.get("sic3"),
+                    "sic4": example.get("sic4"),
+                })
+            else:
+                # Split into overlapping chunks
+                stride = self.max_length // 20
+                for i in range(0, len(encoding["input_ids"]), stride):
+                    chunk_ids = encoding["input_ids"][i:i + self.max_length]
+                    chunk_mask = encoding["attention_mask"][i:i + self.max_length]
+
+                    if len(chunk_ids) < 64:
+                        continue
+
+                    processed.append({
+                        "input_ids": chunk_ids,
+                        "attention_mask": chunk_mask,
+                        "sic2": example.get("sic2"),
+                        "sic3": example.get("sic3"),
+                        "sic4": example.get("sic4"),
+                    })
 
         return processed
 
