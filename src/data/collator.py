@@ -4,7 +4,7 @@ import torch
 
 
 @dataclass
-class DataCollatorForPretraining(DataCollatorForLanguageModeling):
+class Collator(DataCollatorForLanguageModeling):
     """Handles MLM and preserves SIC metadata (no NSP)."""
 
     def __call__(self, features):
