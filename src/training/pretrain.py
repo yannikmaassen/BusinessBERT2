@@ -33,6 +33,13 @@ def load_config(path: str, data_override: str = None, report_to: str = None) -> 
     return config
 
 
+def setup_tokenizer(base_tokenizer: str):
+    tokenizer = AutoTokenizer.from_pretrained(base_tokenizer, use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    return tokenizer
+
+
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
@@ -56,6 +63,7 @@ def main():
         wandb.define_metric("*", step_metric="global_step")
 
     # ---------------- Data ----------------
+    print("Loading dataset...")
     dataset = read_jsonl(config["jsonl_path"])
     print(f"Loaded {len(dataset)} rows")
 
@@ -67,11 +75,8 @@ def main():
         random_state=config.get("seed", 42),
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
+    tokenizer = setup_tokenizer(config["base_tokenizer"])
 
-    print("Building taxonomy maps...")
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
     print(
         f"SIC sizes: "
@@ -80,11 +85,11 @@ def main():
         f"4-digit={len(taxonomy_maps['sic4_list'])}"
     )
 
-    print("Tokenizing datasets...")
+    print("Tokenizing train/val datasets...")
     train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
     val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
-    collate = Collator(
+    data_collator = Collator(
         tokenizer=tokenizer
     )
 
@@ -101,6 +106,7 @@ def main():
         A43=taxonomy_maps["A43"].to(device) if len(taxonomy_maps["sic4_list"]) and len(taxonomy_maps["sic3_list"]) else torch.empty(0),
         loss_weights=config["loss_weights"],
     )
+
     model.to(device)
 
     if use_wandb and wandb is not None and config.get("wandb_watch", True):
@@ -137,7 +143,7 @@ def main():
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        data_collator=collate,
+        data_collator=data_collator,
         taxonomy_maps=taxonomy_maps,
         total_steps=total_steps,
     )
