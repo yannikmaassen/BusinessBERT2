@@ -49,7 +49,10 @@ class MultiTaskTrainer(Trainer):
             log_dict["global_step"] = self.state.global_step
 
             # Log to WandB
-            wandb.log(log_dict)
+            wandb.log({
+                **{f"loss/{k}": v.item() for k, v in outputs["losses"].items()},
+                **{f"metrics/{k}": v.item() for k, v in outputs["metrics"].items()},
+            })
 
         return (loss, outputs) if return_outputs else loss
 

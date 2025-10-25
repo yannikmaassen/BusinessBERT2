@@ -18,7 +18,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
     """
     BERT encoder with:
       - MLM (token-level)
-      - NSP (binary)
       - IC hierarchical (SIC2/3/4) + upward consistency (SIC4→SIC3 and SIC4→SIC2 via KL)
         * Multi-level cross-entropy at SIC2, SIC3, SIC4
         * Consistency encourages ancestor heads (SIC2/SIC3) to match leaf-implied marginals from SIC4
@@ -66,15 +65,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.ce = nn.CrossEntropyLoss(ignore_index=-100)
         self.init_weights()
 
-
     def forward(
-        self,
-        input_ids,
-        attention_mask=None,
-        mlm_labels: Optional[torch.Tensor] = None,
-        sic2: Optional[torch.Tensor] = None,
-        sic3: Optional[torch.Tensor] = None,
-        sic4: Optional[torch.Tensor] = None,
+            self,
+            input_ids,
+            attention_mask=None,
+            mlm_labels: Optional[torch.Tensor] = None,
+            sic2: Optional[torch.Tensor] = None,
+            sic3: Optional[torch.Tensor] = None,
+            sic4: Optional[torch.Tensor] = None,
     ):
         base_model = self.bert.bert
         transformer_outputs = base_model(
@@ -84,14 +82,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         sequence_output = transformer_outputs.last_hidden_state
         pooled_output = self.dropout(transformer_outputs.pooler_output)
 
-        # Extract MLM logits using built-in prediction head
         mlm_logits = self.bert.cls.predictions(sequence_output)
 
-        sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None  # [batch, n2]
-        sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None  # [batch, n3]
-        sic4_logits = self.head_sic4(pooled_output) if self.head_sic4 is not None else None # [batch, n4]
+        sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None
+        sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None
+        sic4_logits = self.head_sic4(pooled_output) if self.head_sic4 is not None else None
 
         losses: Dict[str, torch.Tensor] = {}
+        metrics: Dict[str, torch.Tensor] = {}
         total_loss = 0.0
 
         # ----- MLM -----
@@ -100,25 +98,55 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             losses["mlm"] = mlm_loss
             total_loss = total_loss + self.loss_weights.get("mlm", 1.0) * mlm_loss
 
+            # MLM accuracy (only on masked tokens, ignore -100)
+            mask = mlm_labels != -100
+            if mask.any():
+                predictions = mlm_logits.argmax(dim=-1)
+                correct = (predictions == mlm_labels) & mask
+                metrics["mlm_accuracy"] = correct.sum().float() / mask.sum().float()
+
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
             ic2_loss = self.ce(sic2_logits, sic2)
             losses["ic2"] = ic2_loss
             total_loss += self.loss_weights.get("ic2", 0.0) * ic2_loss
 
+            # SIC2 accuracy
+            mask = sic2 != -100
+            if mask.any():
+                predictions = sic2_logits.argmax(dim=-1)
+                correct = (predictions == sic2) & mask
+                metrics["ic2_accuracy"] = correct.sum().float() / mask.sum().float()
+
         if sic3_logits is not None and sic3 is not None:
             ic3_loss = self.ce(sic3_logits, sic3)
             losses["ic3"] = ic3_loss
             total_loss += self.loss_weights.get("ic3", 0.0) * ic3_loss
+
+            # SIC3 accuracy
+            mask = sic3 != -100
+            if mask.any():
+                predictions = sic3_logits.argmax(dim=-1)
+                correct = (predictions == sic3) & mask
+                metrics["ic3_accuracy"] = correct.sum().float() / mask.sum().float()
 
         if sic4_logits is not None and sic4 is not None:
             ic4_loss = self.ce(sic4_logits, sic4)
             losses["ic4"] = ic4_loss
             total_loss += self.loss_weights.get("ic4", 0.0) * ic4_loss
 
+            # SIC4 accuracy
+            mask = sic4 != -100
+            if mask.any():
+                predictions = sic4_logits.argmax(dim=-1)
+                correct = (predictions == sic4) & mask
+                metrics["ic4_accuracy"] = correct.sum().float() / mask.sum().float()
+
         # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
-        have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (self.child_to_parent_matrix_sic4_to_sic3.numel() > 0)
-        have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (self.child_to_parent_matrix_sic4_to_sic2.numel() > 0)
+        have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (
+                    self.child_to_parent_matrix_sic4_to_sic3.numel() > 0)
+        have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (
+                    self.child_to_parent_matrix_sic4_to_sic2.numel() > 0)
 
         if have_m43 or have_m42:
             parts = []
@@ -128,15 +156,17 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
             if have_m43:
                 # implied SIC3 distribution by summing SIC4 children
-                implied_p3 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic3)  # [B, n3], sums to 1
-                p3 = F.softmax(sic3_logits, dim=-1)
-                parts.append(_kl_div(p3.clamp_min(eps).log(), implied_p3))
+                implied_p3 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic3)  # [B, n3]
+                log_p3 = F.log_softmax(sic3_logits, dim=-1)
+                # KL(implied || predicted) to encourage predicted to match implied
+                parts.append(_kl_div(log_p3, implied_p3))
 
             if have_m42:
-                # implied SIC2 distribution by summing SIC4 children (via 4->3->2)
-                implied_p2 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic2)  # [B, n2], sums to 1
-                p2 = F.softmax(sic2_logits, dim=-1)
-                parts.append(_kl_div(p2.clamp_min(eps).log(), implied_p2))
+                # implied SIC2 distribution by summing SIC4 children
+                implied_p2 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic2)  # [B, n2]
+                log_p2 = F.log_softmax(sic2_logits, dim=-1)
+                # KL(implied || predicted) to encourage predicted to match implied
+                parts.append(_kl_div(log_p2, implied_p2))
 
             if parts:
                 consistency_loss = torch.stack(parts).mean()
@@ -146,6 +176,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         return {
             "loss": total_loss,
             "losses": losses,
+            "metrics": metrics,
             "mlm_logits": mlm_logits,
             "ic2_logits": sic2_logits,
             "ic3_logits": sic3_logits,
