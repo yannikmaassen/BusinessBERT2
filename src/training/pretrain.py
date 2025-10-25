@@ -67,11 +67,6 @@ def main():
         random_state=config.get("seed", 42),
     )
 
-    # Create examples (sentence pairs with SOP labels and SIC labels)
-    # print("Creating train/val examples...")
-    # train_examples = make_examples(train_rows, config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
-    # val_examples   = make_examples(val_rows,   config["field_text"], config["field_sic2"], config["field_sic3"], config["field_sic4"])
-
     tokenizer = AutoTokenizer.from_pretrained(config["base_tokenizer"])
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token if getattr(tokenizer, "eos_token", None) else "[PAD]"
