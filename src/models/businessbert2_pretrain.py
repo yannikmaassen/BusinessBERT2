@@ -127,14 +127,16 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             p4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
 
             if have_m43:
-                # implied SIC3 distribution by summing SIC4 children
-                implied_p3 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic3)  # [B, n3], sums to 1
+                # Cast buffer to match p4's dtype for matrix multiplication
+                m43 = self.child_to_parent_matrix_sic4_to_sic3.to(p4.dtype)
+                implied_p3 = torch.matmul(p4, m43)
                 p3 = F.softmax(sic3_logits, dim=-1)
                 parts.append(_kl_div(p3.clamp_min(eps).log(), implied_p3))
 
             if have_m42:
-                # implied SIC2 distribution by summing SIC4 children (via 4->3->2)
-                implied_p2 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic2)  # [B, n2], sums to 1
+                # Cast buffer to match p4's dtype for matrix multiplication
+                m42 = self.child_to_parent_matrix_sic4_to_sic2.to(p4.dtype)
+                implied_p2 = torch.matmul(p4, m42)
                 p2 = F.softmax(sic2_logits, dim=-1)
                 parts.append(_kl_div(p2.clamp_min(eps).log(), implied_p2))
 
