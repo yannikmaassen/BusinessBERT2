@@ -1,6 +1,7 @@
 from typing import Dict, Any, List, Optional
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizerBase
+from tqdm import tqdm
 
 
 class PretrainDataset(Dataset):
@@ -13,95 +14,80 @@ class PretrainDataset(Dataset):
             idx3: Dict[str, int],
             idx4: Dict[str, int],
     ):
-        self.raw_examples = raw_examples
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.idx2 = idx2
         self.idx3 = idx3
         self.idx4 = idx4
 
-        # Build chunk index for efficient sampling
-        self.chunk_index = self._build_chunk_index()
-        print(f"Dataset initialized with {len(self.raw_examples)} documents, {len(self.chunk_index)} chunks")
+        print("Preprocessing examples...")
+        self.examples = self._preprocess_examples(raw_examples)
+        print(f"Created {len(self.examples)} training examples")
 
-    def _build_chunk_index(self) -> List[Dict[str, Any]]:
-        """Build index of all chunks without tokenizing."""
-        chunk_index = []
 
-        for doc_idx, example in enumerate(self.raw_examples):
+    def __getitem__(self, idx) -> Dict[str, Any]:
+        example = self.examples[idx]
+
+        return {
+            "input_ids": example["input_ids"],
+            "attention_mask": example["attention_mask"],
+            "sic2": self._map_sic_code(example["sic2"], self.idx2),
+            "sic3": self._map_sic_code(example["sic3"], self.idx3),
+            "sic4": self._map_sic_code(example["sic4"], self.idx4),
+        }
+
+
+    def _preprocess_examples(
+            self,
+            raw_examples: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Preprocess all examples - document level for MLM + IC with chunking."""
+        processed = []
+
+        for example in tqdm(raw_examples, desc="Preprocessing examples"):
             sentences = example.get("sentences", [])
+
             if not sentences:
                 continue
 
-            # Estimate tokens (rough approximation: 1 token ≈ 4 chars)
             full_text = " ".join(sentences)
-            estimated_tokens = len(full_text) // 4
 
-            if estimated_tokens <= self.max_length:
-                # Single chunk
-                chunk_index.append({
-                    "doc_idx": doc_idx,
-                    "chunk_start": 0,
-                    "chunk_end": None,  # Full document
+            encoding = self.tokenizer(
+                full_text,
+                truncation=False,
+                padding=False,
+                return_tensors=None,
+            )
+
+            # If within max_length, process normally
+            if len(encoding["input_ids"]) <= self.max_length:
+                processed.append({
+                    "input_ids": encoding["input_ids"],
+                    "attention_mask": encoding["attention_mask"],
+                    "sic2": example.get("sic2"),
+                    "sic3": example.get("sic3"),
+                    "sic4": example.get("sic4"),
                 })
             else:
-                # Multiple chunks with stride
+                # Split into overlapping chunks
                 stride = int(self.max_length * 0.95)
-                for start in range(0, estimated_tokens, stride):
-                    chunk_index.append({
-                        "doc_idx": doc_idx,
-                        "chunk_start": start,
-                        "chunk_end": start + self.max_length,
+                for i in range(0, len(encoding["input_ids"]), stride):
+                    chunk_ids = encoding["input_ids"][i:i + self.max_length]
+                    chunk_mask = encoding["attention_mask"][i:i + self.max_length]
+
+                    if len(chunk_ids) < 64:
+                        continue
+
+                    processed.append({
+                        "input_ids": chunk_ids,
+                        "attention_mask": chunk_mask,
+                        "sic2": example.get("sic2"),
+                        "sic3": example.get("sic3"),
+                        "sic4": example.get("sic4"),
                     })
 
-        return chunk_index
+        return processed
 
-    def __getitem__(self, idx) -> Dict[str, Any]:
-        chunk_info = self.chunk_index[idx]
-        example = self.raw_examples[chunk_info["doc_idx"]]
-
-        # Get full text
-        sentences = example.get("sentences", [])
-        full_text = " ".join(sentences)
-
-        # Tokenize full document
-        encoding = self.tokenizer(
-            full_text,
-            truncation=False,
-            padding=False,
-            return_tensors=None,
-        )
-
-        # Extract chunk
-        start = chunk_info["chunk_start"]
-        end = chunk_info["chunk_end"]
-
-        if end is None:
-            # Full document fits in max_length
-            chunk_ids = encoding["input_ids"]
-            chunk_mask = encoding["attention_mask"]
-        else:
-            # Extract chunk with actual token positions
-            chunk_ids = encoding["input_ids"][start:end]
-            chunk_mask = encoding["attention_mask"][start:end]
-
-        # Pad to max_length
-        padding_length = self.max_length - len(chunk_ids)
-        if padding_length > 0:
-            chunk_ids = chunk_ids + [self.tokenizer.pad_token_id] * padding_length
-            chunk_mask = chunk_mask + [0] * padding_length
-        else:
-            # Truncate if needed
-            chunk_ids = chunk_ids[:self.max_length]
-            chunk_mask = chunk_mask[:self.max_length]
-
-        return {
-            "input_ids": chunk_ids,
-            "attention_mask": chunk_mask,
-            "sic2": self._map_sic_code(example.get("sic2"), self.idx2),
-            "sic3": self._map_sic_code(example.get("sic3"), self.idx3),
-            "sic4": self._map_sic_code(example.get("sic4"), self.idx4),
-        }
 
     def _map_sic_code(self, sic_value: Optional[str], sic_to_idx: Dict[str, int]) -> int:
         """Map SIC code to index, handling None and 'NA' values."""
@@ -109,5 +95,6 @@ class PretrainDataset(Dataset):
             return -100
         return sic_to_idx.get(str(sic_value), -100)
 
+
     def __len__(self) -> int:
-        return len(self.chunk_index)
+        return len(self.examples)
