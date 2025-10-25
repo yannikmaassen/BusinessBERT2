@@ -1,24 +1,41 @@
 from dataclasses import dataclass
-from transformers import DataCollatorForLanguageModeling
+from typing import List, Dict, Any
 import torch
-
+from transformers import (
+    PreTrainedTokenizerBase,
+    DataCollatorForLanguageModeling,
+)
 
 @dataclass
-class Collator(DataCollatorForLanguageModeling):
-    """Handles MLM and preserves SIC metadata (no NSP)."""
+class Collator:
+    tokenizer: PreTrainedTokenizerBase
+    mlm_probability: float = 0.15
 
-    def __call__(self, features):
-        # Extract SIC codes before MLM processing
-        sic2 = torch.tensor([f.pop("sic2") for f in features])
-        sic3 = torch.tensor([f.pop("sic3") for f in features])
-        sic4 = torch.tensor([f.pop("sic4") for f in features])
+    def __post_init__(self):
+        self._mlm = DataCollatorForLanguageModeling(
+            tokenizer=self.tokenizer,
+            mlm_probability=self.mlm_probability,
+        )
 
-        # Apply MLM masking
-        batch = super().__call__(features)
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
+        # Pull out custom labels first (so the MLM collator ignores them)
+        extra_keys = ["nsp_label", "sic2", "sic3", "sic4"]
 
-        # Add back SIC data
-        batch["sic2"] = sic2
-        batch["sic3"] = sic3
-        batch["sic4"] = sic4
+        extras = {k: torch.tensor([f[k] for f in features], dtype=torch.long)
+                  for k in extra_keys if k in features[0]}
+
+        base_features = [{k: v for k, v in f.items() if k not in extra_keys}
+                         for f in features]
+
+        # HF handles padding + MLM masking (returns 'input_ids', 'attention_mask', 'labels', and 'token_type_ids' if present)
+        batch = self._mlm(base_features)
+
+        # Rename to match expected output
+        batch["mlm_labels"] = batch.pop("labels")
+        if "nsp_label" in extras:
+             batch["nsp_labels"] = extras["nsp_label"]
+        for k in ["sic2", "sic3", "sic4"]:
+            if k in extras:
+                batch[k] = extras[k]
 
         return batch

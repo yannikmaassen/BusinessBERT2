@@ -82,16 +82,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             attention_mask=attention_mask,
         )
         sequence_output = transformer_outputs.last_hidden_state
-        cls_output = sequence_output[:, 0, :]
+        pooled_output = self.dropout(transformer_outputs.pooler_output)
 
         # Extract MLM logits using built-in prediction head
         mlm_logits = self.bert.cls.predictions(sequence_output)
-        # Extract NSP logits using built-in seq_relationship head
-        # nsp_logits = self.bert.cls.seq_relationship(pooled_output)
 
-        sic2_logits = self.sic2_head(cls_output)
-        sic3_logits = self.sic3_head(cls_output)
-        sic4_logits = self.sic4_head(cls_output)
+        sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None  # [batch, n2]
+        sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None  # [batch, n3]
+        sic4_logits = self.head_sic4(pooled_output) if self.head_sic4 is not None else None # [batch, n4]
 
         losses: Dict[str, torch.Tensor] = {}
         total_loss = 0.0
@@ -101,12 +99,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             mlm_loss = self.ce(mlm_logits.view(-1, mlm_logits.size(-1)), mlm_labels.view(-1))
             losses["mlm"] = mlm_loss
             total_loss = total_loss + self.loss_weights.get("mlm", 1.0) * mlm_loss
-
-        # ----- NSP -----
-        # if nsp_labels is not None:
-        #     nsp_loss = self.ce(nsp_logits, nsp_labels)
-        #     losses["nsp"] = nsp_loss
-        #     total_loss = total_loss + self.loss_weights.get("nsp", 1.0) * nsp_loss
 
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
@@ -155,7 +147,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             "loss": total_loss,
             "losses": losses,
             "mlm_logits": mlm_logits,
-            # "nsp_logits": nsp_logits,
             "ic2_logits": sic2_logits,
             "ic3_logits": sic3_logits,
             "ic4_logits": sic4_logits,
