@@ -50,7 +50,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         loss_weights: Dict[str, float],
     ):
         super().__init__(config)
-        self.bert = BertModel(config)
+        self.bert = BertForMaskedLM(config, add_pooling_layer=True)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
@@ -77,14 +77,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             sic3: Optional[torch.Tensor] = None,
             sic4: Optional[torch.Tensor] = None,
     ):
-        transformer_outputs = self.bert.bert(
+        transformer_outputs = self.bert(
             input_ids=input_ids,
             attention_mask=attention_mask,
         )
         sequence_output = transformer_outputs.last_hidden_state
         pooled_output = self.dropout(transformer_outputs.pooler_output)
 
-        mlm_logits = self.bert.cls(sequence_output)
+        mlm_logits = transformer_outputs.logits
 
         sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None
         sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None
