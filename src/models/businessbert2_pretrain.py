@@ -2,7 +2,7 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertConfig, BertPreTrainedModel, BertForPreTraining
+from transformers import BertConfig, BertPreTrainedModel, BertForMaskedLM
 
 
 def _kl_div(p_log, q, eps: float = 1e-8):
@@ -12,6 +12,22 @@ def _kl_div(p_log, q, eps: float = 1e-8):
     q: target probabilities (sum to 1 over last dim)
     """
     return F.kl_div(p_log, q.clamp(min=eps), reduction="batchmean")
+
+
+def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
+    # Create M43 and M42 matrices from A43 and A32
+
+    if A43.numel():
+        M43 = A43.clone().to(torch.float32).contiguous()
+    else:
+        M43 = torch.empty(0)
+
+    if A43.numel() and A32.numel():
+        M42 = torch.matmul(A43.to(torch.float32), A32.to(torch.float32)).contiguous()
+    else:
+        M42 = torch.empty(0)
+
+    return M43, M42
 
 
 class BusinessBERT2Pretrain(BertPreTrainedModel):
@@ -34,7 +50,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         loss_weights: Dict[str, float],
     ):
         super().__init__(config)
-        self.bert = BertForPreTraining(config)
+        self.bert = BertForMaskedLM(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
@@ -44,22 +60,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
         # M42: [|SIC4| x |SIC2|] = A43 @ A32 to sum leaf probs upward to SIC2
-        if A43.numel():
-            M43 = A43.clone().to(torch.float32).contiguous()
-        else:
-            M43 = torch.empty(0)
-
-        if A43.numel() and A32.numel():
-            M42 = torch.matmul(A43.to(torch.float32), A32.to(torch.float32)).contiguous()
-        else:
-            M42 = torch.empty(0)
-
-        self.register_buffer("M43", M43)  # [|SIC4| x |SIC3|]
-        self.register_buffer("M42", M42)  # [|SIC4| x |SIC2|]
-
-        # Register child-to-parent matrices as buffers (non-trainable)
-        self.register_buffer("child_to_parent_matrix_sic4_to_sic3", M43)
-        self.register_buffer("child_to_parent_matrix_sic4_to_sic2", M42)
+        M43, M42 = create_buffers(A43, A32)
+        self.register_buffer("M43", M43)  # [|SIC4| x |SIC3|] - child-to-parent mapping
+        self.register_buffer("M42", M42)  # [|SIC4| x |SIC2|] - child-to-grandparent mapping
 
         self.loss_weights = dict(loss_weights)
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
@@ -74,15 +77,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             sic3: Optional[torch.Tensor] = None,
             sic4: Optional[torch.Tensor] = None,
     ):
-        base_model = self.bert.bert
-        transformer_outputs = base_model(
+        transformer_outputs = self.bert.bert(
             input_ids=input_ids,
             attention_mask=attention_mask,
         )
         sequence_output = transformer_outputs.last_hidden_state
         pooled_output = self.dropout(transformer_outputs.pooler_output)
 
-        mlm_logits = self.bert.cls.predictions(sequence_output)
+        mlm_logits = self.bert.cls(sequence_output)
 
         sic2_logits = self.head_sic2(pooled_output) if self.head_sic2 is not None else None
         sic3_logits = self.head_sic3(pooled_output) if self.head_sic3 is not None else None
@@ -144,9 +146,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
         have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (
-                    self.child_to_parent_matrix_sic4_to_sic3.numel() > 0)
+                    self.M43.numel() > 0)
         have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (
-                    self.child_to_parent_matrix_sic4_to_sic2.numel() > 0)
+                    self.M42.numel() > 0)
 
         if have_m43 or have_m42:
             parts = []
@@ -155,14 +157,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
             if have_m43:
                 # implied SIC3 distribution by summing SIC4 children
-                implied_p3 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic3)  # [B, n3]
+                implied_p3 = torch.matmul(p4, self.M43)  # [B, n3]
                 log_p3 = F.log_softmax(sic3_logits, dim=-1)
                 # KL(predicted || implied) to encourage predicted to match implied
                 parts.append(_kl_div(log_p3, implied_p3))
 
             if have_m42:
                 # implied SIC2 distribution by summing SIC4 children
-                implied_p2 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic2)  # [B, n2]
+                implied_p2 = torch.matmul(p4, self.M42)  # [B, n2]
                 log_p2 = F.log_softmax(sic2_logits, dim=-1)
                 # KL(predicted || implied) to encourage predicted to match implied
                 parts.append(_kl_div(log_p2, implied_p2))
