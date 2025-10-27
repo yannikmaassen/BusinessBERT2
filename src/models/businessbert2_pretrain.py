@@ -5,13 +5,13 @@ import torch.nn.functional as F
 from transformers import BertConfig, BertPreTrainedModel, BertForMaskedLM
 
 
-def _kl_div(p_log, q, eps: float = 1e-8):
+def _kl_div(predicted_log, target, eps: float = 1e-8):
     """
-    KL(q || exp(p_log)) with batchmean reduction.
-    p_log: log probabilities (e.g., log softmax outputs)
-    q: target probabilities (sum to 1 over last dim)
+    Forward KL: KL(predicted || target).
+    Encourages predicted to match target (implied).
     """
-    return F.kl_div(p_log, q.clamp(min=eps), reduction="batchmean")
+    target_safe = target.clamp(min=eps)
+    return F.kl_div(predicted_log, target_safe, reduction="batchmean")
 
 
 def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
@@ -111,7 +111,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if sic2_logits is not None and sic2 is not None:
             ic2_loss = self.cross_entropy(sic2_logits, sic2)
             losses["ic2"] = ic2_loss
-            total_loss += self.loss_weights.get("ic2", 0.0) * ic2_loss
+            total_loss += self.loss_weights.get("ic2", 1.0) * ic2_loss
 
             # SIC2 accuracy
             mask = sic2 != -100
@@ -123,7 +123,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if sic3_logits is not None and sic3 is not None:
             ic3_loss = self.cross_entropy(sic3_logits, sic3)
             losses["ic3"] = ic3_loss
-            total_loss += self.loss_weights.get("ic3", 0.0) * ic3_loss
+            total_loss += self.loss_weights.get("ic3", 0.8) * ic3_loss
 
             # SIC3 accuracy
             mask = sic3 != -100
@@ -135,7 +135,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if sic4_logits is not None and sic4 is not None:
             ic4_loss = self.cross_entropy(sic4_logits, sic4)
             losses["ic4"] = ic4_loss
-            total_loss += self.loss_weights.get("ic4", 0.0) * ic4_loss
+            total_loss += self.loss_weights.get("ic4", 0.5) * ic4_loss
 
             # SIC4 accuracy
             mask = sic4 != -100
@@ -172,7 +172,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             if parts:
                 consistency_loss = torch.stack(parts).mean()
                 losses["consistency"] = consistency_loss
-                total_loss += self.loss_weights.get("consistency", 0.0) * consistency_loss
+                total_loss += self.loss_weights.get("consistency", 0.2) * consistency_loss
 
         return {
             "loss": total_loss,
