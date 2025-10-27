@@ -93,4 +93,4 @@ def build_code_index_mappings(
     sic3_code_to_index = {code: index for index, code in enumerate(sorted(sic3_code_list))}
     sic2_code_to_index = {code: index for index, code in enumerate(sorted(sic2_code_list))}
 
-    return sic4_code_to_index, sic3_code_to_index, sic2_code_to_index
+    return sic2_code_to_index, sic3_code_to_index, sic4_code_to_index
