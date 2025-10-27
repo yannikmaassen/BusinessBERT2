@@ -21,7 +21,7 @@ class PretrainDataset(Dataset):
         self.indexed_sic4_list = indexed_sic4_list
 
         print("Preprocessing examples...")
-        self.examples = self._preprocess_examples(raw_examples)
+        self.examples = self._preprocess_examples(raw_examples[0:50000])
         print(f"Created {len(self.examples)} training examples")
 
 
