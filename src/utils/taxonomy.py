@@ -82,15 +82,15 @@ def build_taxonomy_maps(rows: List[dict], field_sic2: str, field_sic3: str, fiel
 
 
 def build_code_index_mappings(
-    sic4_code_list: List[str],
-    sic3_code_list: List[str],
     sic2_code_list: List[str],
+    sic3_code_list: List[str],
+    sic4_code_list: List[str],
 ) -> Tuple[Dict[str, int], Dict[str, int], Dict[str, int]]:
     """
     Create string-to-index dictionaries for each SIC level.
     """
-    sic4_code_to_index = {code: index for index, code in enumerate(sorted(sic4_code_list))}
-    sic3_code_to_index = {code: index for index, code in enumerate(sorted(sic3_code_list))}
     sic2_code_to_index = {code: index for index, code in enumerate(sorted(sic2_code_list))}
+    sic3_code_to_index = {code: index for index, code in enumerate(sorted(sic3_code_list))}
+    sic4_code_to_index = {code: index for index, code in enumerate(sorted(sic4_code_list))}
 
     return sic2_code_to_index, sic3_code_to_index, sic4_code_to_index
