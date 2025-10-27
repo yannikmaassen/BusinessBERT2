@@ -1,5 +1,6 @@
 from transformers import Trainer
 import wandb
+import math
 
 
 class MultiTaskTrainer(Trainer):
@@ -58,8 +59,6 @@ class MultiTaskTrainer(Trainer):
 
     @staticmethod
     def _coarse_to_fine_weights(step, total_steps):
-        """Same logic as your current implementation"""
-        import math
         progress = min(max(step / max(1, total_steps), 0.0), 1.0)
         cosine_ramp = 0.5 - 0.5 * math.cos(math.pi * progress)
 
@@ -71,7 +70,6 @@ class MultiTaskTrainer(Trainer):
         return w2 / total, w3 / total, w4 / total
 
     def log(self, logs, *args, **kwargs):
-        """Add custom metrics to logging"""
         # Add current loss weights
         if hasattr(self.model, 'loss_weights'):
             logs["w_ic2"] = float(self.model.loss_weights.get("ic2", 0))
@@ -87,8 +85,6 @@ class MultiTaskTrainer(Trainer):
             # Individual losses
             if "mlm" in losses:
                 logs[f"{prefix}loss_mlm"] = float(losses["mlm"])
-            if "nsp" in losses:
-                logs[f"{prefix}loss_nsp"] = float(losses["nsp"])
             if "ic2" in losses:
                 logs[f"{prefix}loss_ic2"] = float(losses["ic2"])
             if "ic3" in losses:
@@ -97,16 +93,6 @@ class MultiTaskTrainer(Trainer):
                 logs[f"{prefix}loss_ic4"] = float(losses["ic4"])
             if "consistency" in losses:
                 logs[f"{prefix}loss_consistency"] = float(losses["consistency"])
-
-            # Accuracies
-            # if "acc_sop" in outputs:
-            #     logs[f"{prefix}acc_sop"] = float(outputs["acc_sop"])
-            # if "acc_ic2" in outputs:
-            #     logs[f"{prefix}acc_ic2"] = float(outputs["acc_ic2"])
-            # if "acc_ic3" in outputs:
-            #     logs[f"{prefix}acc_ic3"] = float(outputs["acc_ic3"])
-            # if "acc_ic4" in outputs:
-            #     logs[f"{prefix}acc_ic4"] = float(outputs["acc_ic4"])
 
         # Call parent's log with all arguments
         super().log(logs, *args, **kwargs)

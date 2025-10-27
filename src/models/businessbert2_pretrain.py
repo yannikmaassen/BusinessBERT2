@@ -62,7 +62,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.register_buffer("child_to_parent_matrix_sic4_to_sic2", M42)
 
         self.loss_weights = dict(loss_weights)
-        self.ce = nn.CrossEntropyLoss(ignore_index=-100)
+        self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
         self.init_weights()
 
     def forward(
@@ -94,7 +94,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         # ----- MLM -----
         if mlm_labels is not None:
-            mlm_loss = self.ce(mlm_logits.view(-1, mlm_logits.size(-1)), mlm_labels.view(-1))
+            mlm_loss = self.cross_entropy(mlm_logits.view(-1, mlm_logits.size(-1)), mlm_labels.view(-1))
             losses["mlm"] = mlm_loss
             total_loss = total_loss + self.loss_weights.get("mlm", 1.0) * mlm_loss
 
@@ -107,7 +107,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
-            ic2_loss = self.ce(sic2_logits, sic2)
+            ic2_loss = self.cross_entropy(sic2_logits, sic2)
             losses["ic2"] = ic2_loss
             total_loss += self.loss_weights.get("ic2", 0.0) * ic2_loss
 
@@ -119,7 +119,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 metrics["ic2_accuracy"] = correct.sum().float() / mask.sum().float()
 
         if sic3_logits is not None and sic3 is not None:
-            ic3_loss = self.ce(sic3_logits, sic3)
+            ic3_loss = self.cross_entropy(sic3_logits, sic3)
             losses["ic3"] = ic3_loss
             total_loss += self.loss_weights.get("ic3", 0.0) * ic3_loss
 
@@ -131,7 +131,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 metrics["ic3_accuracy"] = correct.sum().float() / mask.sum().float()
 
         if sic4_logits is not None and sic4 is not None:
-            ic4_loss = self.ce(sic4_logits, sic4)
+            ic4_loss = self.cross_entropy(sic4_logits, sic4)
             losses["ic4"] = ic4_loss
             total_loss += self.loss_weights.get("ic4", 0.0) * ic4_loss
 
@@ -150,7 +150,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         if have_m43 or have_m42:
             parts = []
-            eps = 1e-8
 
             p4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
 
@@ -158,14 +157,14 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 # implied SIC3 distribution by summing SIC4 children
                 implied_p3 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic3)  # [B, n3]
                 log_p3 = F.log_softmax(sic3_logits, dim=-1)
-                # KL(implied || predicted) to encourage predicted to match implied
+                # KL(predicted || implied) to encourage predicted to match implied
                 parts.append(_kl_div(log_p3, implied_p3))
 
             if have_m42:
                 # implied SIC2 distribution by summing SIC4 children
                 implied_p2 = torch.matmul(p4, self.child_to_parent_matrix_sic4_to_sic2)  # [B, n2]
                 log_p2 = F.log_softmax(sic2_logits, dim=-1)
-                # KL(implied || predicted) to encourage predicted to match implied
+                # KL(predicted || implied) to encourage predicted to match implied
                 parts.append(_kl_div(log_p2, implied_p2))
 
             if parts:
