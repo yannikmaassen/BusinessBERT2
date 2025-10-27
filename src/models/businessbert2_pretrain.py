@@ -2,7 +2,7 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertConfig, BertPreTrainedModel, BertForMaskedLM
+from transformers import BertConfig, BertPreTrainedModel, BertForMaskedLM, BertModel
 
 
 def _kl_div(predicted_log, target, eps: float = 1e-8):
@@ -50,7 +50,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         loss_weights: Dict[str, float],
     ):
         super().__init__(config)
-        self.bert = BertForMaskedLM(config)
+        self.bert = BertModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
