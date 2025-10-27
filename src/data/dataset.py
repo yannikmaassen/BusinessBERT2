@@ -13,6 +13,7 @@ class PretrainDataset(Dataset):
             indexed_sic2_list: Dict[str, int],
             indexed_sic3_list: Dict[str, int],
             indexed_sic4_list: Dict[str, int],
+            preprocess_device: str = "cpu",
     ):
         self.tokenizer = tokenizer
         self.max_length = max_length
@@ -20,9 +21,20 @@ class PretrainDataset(Dataset):
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
 
+        # Force preprocessing on CPU
+        original_device = next(self.tokenizer.parameters()).device if hasattr(self.tokenizer, 'parameters') else None
+
+        # Temporarily move tokenizer to CPU for preprocessing
+        if hasattr(self.tokenizer, 'to'):
+            self.tokenizer = self.tokenizer.to(preprocess_device)
+
         print("Preprocessing examples...")
         self.examples = self._preprocess_examples(raw_examples[0:500])
         print(f"Created {len(self.examples)} training examples")
+
+        # Move tokenizer back to original device if needed
+        if original_device is not None and hasattr(self.tokenizer, 'to'):
+            self.tokenizer = self.tokenizer.to(original_device)
 
 
     def __getitem__(self, idx) -> Dict[str, Any]:
