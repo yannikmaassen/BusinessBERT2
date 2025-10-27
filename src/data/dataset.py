@@ -67,8 +67,7 @@ class PretrainDataset(Dataset):
                     "sic4": example.get("sic4"),
                 })
             else:
-                stride = int(self.max_length * 0.95) # 5% overlap
-                for i in range(0, len(encoding["input_ids"]), stride):
+                for i in range(0, len(encoding["input_ids"]), self.max_length):
                     chunk_ids = encoding["input_ids"][i:i + self.max_length]
                     chunk_mask = encoding["attention_mask"][i:i + self.max_length]
 
