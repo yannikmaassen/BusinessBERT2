@@ -10,10 +10,50 @@ class MultiTaskTrainer(Trainer):
         self.total_steps = total_steps
         self.current_step = 0
 
+        # SIC code statistics tracking
+        self.sic_stats = {
+            'total_samples': 0,
+            'sic2_invalid': 0,
+            'sic3_invalid': 0,
+            'sic4_invalid': 0,
+        }
+
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
         Override to handle multi-task outputs and dynamic loss weights.
         """
+        # Track SIC code statistics
+        if model.training:
+            batch_size = inputs['input_ids'].size(0)
+            self.sic_stats['total_samples'] += batch_size
+
+            if 'sic2' in inputs:
+                self.sic_stats['sic2_invalid'] += (inputs['sic2'] == -100).sum().item()
+            if 'sic3' in inputs:
+                self.sic_stats['sic3_invalid'] += (inputs['sic3'] == -100).sum().item()
+            if 'sic4' in inputs:
+                self.sic_stats['sic4_invalid'] += (inputs['sic4'] == -100).sum().item()
+
+            # Log statistics every 100 steps
+            if self.current_step > 0 and self.current_step % 100 == 0:
+                total = self.sic_stats['total_samples']
+                if total > 0:
+                    print(f"\n=== SIC Code Statistics (Step {self.current_step}) ===", flush=True)
+                    print(f"Total samples processed: {total}", flush=True)
+
+                    sic2_valid = total - self.sic_stats['sic2_invalid']
+                    sic2_pct = (sic2_valid / total * 100)
+                    print(f"SIC2 - Valid: {sic2_valid}/{total} ({sic2_pct:.2f}%) | Invalid: {self.sic_stats['sic2_invalid']}", flush=True)
+
+                    sic3_valid = total - self.sic_stats['sic3_invalid']
+                    sic3_pct = (sic3_valid / total * 100)
+                    print(f"SIC3 - Valid: {sic3_valid}/{total} ({sic3_pct:.2f}%) | Invalid: {self.sic_stats['sic3_invalid']}", flush=True)
+
+                    sic4_valid = total - self.sic_stats['sic4_invalid']
+                    sic4_pct = (sic4_valid / total * 100)
+                    print(f"SIC4 - Valid: {sic4_valid}/{total} ({sic4_pct:.2f}%) | Invalid: {self.sic_stats['sic4_invalid']}", flush=True)
+                    print("=" * 50, flush=True)
+
         # Update loss weights based on training progress
         if self.total_steps:
             w2, w3, w4 = self._coarse_to_fine_weights(self.current_step, self.total_steps)
