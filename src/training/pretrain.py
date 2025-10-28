@@ -289,9 +289,9 @@ def main():
                 running["acc_mlm_correct"] += correct
                 running["acc_mlm_total"] += total
 
-                correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
-                running["acc_sop_correct"] += correct
-                running["acc_sop_total"] += total
+                # correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
+                # running["acc_sop_correct"] += correct
+                # running["acc_sop_total"] += total
 
                 if out["ic2_logits"] is not None:
                     c, t = top1_accuracy(out["ic2_logits"], batch["sic2"])
@@ -312,12 +312,12 @@ def main():
                 if step % max(1, config["logging_steps"] // 5) == 0 or step == 1:
                     progress_bar.set_postfix({
                         "loss_mlm": f"{(running['loss_mlm'] / max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm', 0) else "-",
-                        "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop', 0) else "-",
+                        # "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop', 0) else "-",
                         "loss_ic2": f"{(running['loss_ic2'] / max(1, counts['loss_ic2'])):.3f}" if counts.get('loss_ic2', 0) else "-",
                         "loss_ic3": f"{(running['loss_ic3'] / max(1, counts['loss_ic3'])):.3f}" if counts.get('loss_ic3', 0) else "-",
                         "loss_ic4": f"{(running['loss_ic4'] / max(1, counts['loss_ic4'])):.3f}" if counts.get('loss_ic4', 0) else "-",
                         "cons": f"{(running['loss_consistency'] / max(1, counts['loss_consistency'])):.3f}" if counts.get('loss_consistency', 0) else "-",
-                        "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total', 0) else "-",
+                        # "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total', 0) else "-",
                     })
 
                     # ---- W&B logging at interval
@@ -329,8 +329,8 @@ def main():
                                 log[f"train/{lk}"] = running[lk] / counts[lk]
                         if running.get("acc_mlm_total", 0) > 0:
                             log["train/acc_mlm"] = running["acc_mlm_correct"] / max(1, running["acc_mlm_total"])
-                        if running.get("acc_sop_total", 0) > 0:
-                            log["train/acc_sop"] = running["acc_sop_correct"] / max(1, running["acc_sop_total"])
+                        # if running.get("acc_sop_total", 0) > 0:
+                        #     log["train/acc_sop"] = running["acc_sop_correct"] / max(1, running["acc_sop_total"])
                         if running.get("acc_ic2_total", 0) > 0:
                             log["train/acc_ic2"] = running["acc_ic2_correct"] / running["acc_ic2_total"]
                         if running.get("acc_ic3_total", 0) > 0:
@@ -356,8 +356,8 @@ def main():
                                 msg.append(f"{lk}:{running[lk] / counts[lk]:.4f}")
                         if running.get("acc_mlm_total", 0) > 0:
                             msg.append(f"acc_mlm:{running['acc_mlm_correct'] / max(1, running['acc_mlm_total']):.4f}")
-                        if running.get("acc_sop_total", 0) > 0:
-                            msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
+                        # if running.get("acc_sop_total", 0) > 0:
+                        #     msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
                         if running.get("acc_ic2_total", 0) > 0:
                             msg.append(f"acc_ic2:{running['acc_ic2_correct'] / running['acc_ic2_total']:.4f}")
                         if running.get("acc_ic3_total", 0) > 0:
@@ -423,9 +423,9 @@ def main():
                 running["acc_mlm_correct"] += correct
                 running["acc_mlm_total"] += total
 
-                correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
-                running["acc_sop_correct"] += correct
-                running["acc_sop_total"] += total
+                # correct, total = binary_accuracy(out["sop_logits"], batch["sop_labels"])
+                # running["acc_sop_correct"] += correct
+                # running["acc_sop_total"] += total
 
                 if out["ic2_logits"] is not None:
                     c, t = top1_accuracy(out["ic2_logits"], batch["sic2"])
@@ -445,12 +445,12 @@ def main():
                 if step % max(1, config["logging_steps"] // 5) == 0 or step == 1:
                     progress_bar.set_postfix({
                         "loss_mlm": f"{(running['loss_mlm'] / max(1, counts['loss_mlm'])):.3f}" if counts.get('loss_mlm', 0) else "-",
-                        "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop', 0) else "-",
+                        # "loss_sop": f"{(running['loss_sop'] / max(1, counts['loss_sop'])):.3f}" if counts.get('loss_sop', 0) else "-",
                         "loss_ic2": f"{(running['loss_ic2'] / max(1, counts['loss_ic2'])):.3f}" if counts.get('loss_ic2', 0) else "-",
                         "loss_ic3": f"{(running['loss_ic3'] / max(1, counts['loss_ic3'])):.3f}" if counts.get('loss_ic3', 0) else "-",
                         "loss_ic4": f"{(running['loss_ic4'] / max(1, counts['loss_ic4'])):.3f}" if counts.get('loss_ic4', 0) else "-",
                         "cons": f"{(running['loss_consistency'] / max(1, counts['loss_consistency'])):.3f}" if counts.get('loss_consistency', 0) else "-",
-                        "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total', 0) else "-",
+                        # "acc_sop": f"{(running['acc_sop_correct'] / max(1, running['acc_sop_total'])):.3f}" if running.get('acc_sop_total', 0) else "-",
                     })
 
                     # ---- W&B logging at interval
@@ -462,8 +462,8 @@ def main():
                                 log[f"train/{lk}"] = running[lk] / counts[lk]
                         if running.get("acc_mlm_total", 0) > 0:
                             log["train/acc_mlm"] = running["acc_mlm_correct"] / max(1, running["acc_mlm_total"])
-                        if running.get("acc_sop_total", 0) > 0:
-                            log["train/acc_sop"] = running["acc_sop_correct"] / max(1, running["acc_sop_total"])
+                        # if running.get("acc_sop_total", 0) > 0:
+                        #     log["train/acc_sop"] = running["acc_sop_correct"] / max(1, running["acc_sop_total"])
                         if running.get("acc_ic2_total", 0) > 0:
                             log["train/acc_ic2"] = running["acc_ic2_correct"] / running["acc_ic2_total"]
                         if running.get("acc_ic3_total", 0) > 0:
@@ -489,8 +489,8 @@ def main():
                                 msg.append(f"{lk}:{running[lk] / counts[lk]:.4f}")
                         if running.get("acc_mlm_total", 0) > 0:
                             msg.append(f"acc_mlm:{running['acc_mlm_correct'] / max(1, running['acc_mlm_total']):.4f}")
-                        if running.get("acc_sop_total", 0) > 0:
-                            msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
+                        # if running.get("acc_sop_total", 0) > 0:
+                        #     msg.append(f"acc_sop:{running['acc_sop_correct'] / max(1, running['acc_sop_total']):.4f}")
                         if running.get("acc_ic2_total", 0) > 0:
                             msg.append(f"acc_ic2:{running['acc_ic2_correct'] / running['acc_ic2_total']:.4f}")
                         if running.get("acc_ic3_total", 0) > 0:
