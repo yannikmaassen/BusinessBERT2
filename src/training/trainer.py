@@ -18,6 +18,47 @@ class MultiTaskTrainer(Trainer):
             'sic4_invalid': 0,
         }
 
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+        """
+        Override to log individual losses and metrics to wandb.
+        """
+        # Forward pass
+        outputs = model(**inputs)
+        loss = outputs["loss"]
+
+        # Log individual losses and metrics to WandB during training
+        if model.training and self.state.global_step > 0 and self.args.report_to and "wandb" in self.args.report_to:
+            # Extract individual loss components and metrics
+            loss_dict = outputs.get("losses", {})
+            metrics_dict = outputs.get("metrics", {})
+
+            # Prepare logging dict
+            log_dict = {"train/total_loss": loss.item()}
+
+            # Add individual losses
+            for key, value in loss_dict.items():
+                log_dict[f"train/loss_{key}"] = value.item()
+
+            # Add metrics (accuracies)
+            for key, value in metrics_dict.items():
+                log_dict[f"train/{key}"] = value.item()
+
+            # Add current loss weights
+            if hasattr(model, 'loss_weights'):
+                log_dict["train/w_ic2"] = float(model.loss_weights.get("ic2", 0))
+                log_dict["train/w_ic3"] = float(model.loss_weights.get("ic3", 0))
+                log_dict["train/w_ic4"] = float(model.loss_weights.get("ic4", 0))
+                log_dict["train/w_consistency"] = float(model.loss_weights.get("consistency", 0))
+
+            # Log to WandB
+            wandb.log(log_dict, step=self.state.global_step)
+
+        # Store outputs for evaluation logging
+        if not model.training:
+            self._last_outputs = outputs
+
+        return (loss, outputs) if return_outputs else loss
+
     # def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
     #     """
     #     Override to handle multi-task outputs and dynamic loss weights.
@@ -111,29 +152,28 @@ class MultiTaskTrainer(Trainer):
         return w2 / total, w3 / total, w4 / total
 
     def log(self, logs, *args, **kwargs):
-        # Add current loss weights
+        # Add current loss weights (for both train and eval)
         if hasattr(self.model, 'loss_weights'):
-            logs["w_ic2"] = float(self.model.loss_weights.get("ic2", 0))
-            logs["w_ic3"] = float(self.model.loss_weights.get("ic3", 0))
-            logs["w_ic4"] = float(self.model.loss_weights.get("ic4", 0))
-            logs["w_consistency"] = float(self.model.loss_weights.get("consistency", 0))
+            prefix = "eval_" if "eval_loss" in logs else ""
+            logs[f"{prefix}w_ic2"] = float(self.model.loss_weights.get("ic2", 0))
+            logs[f"{prefix}w_ic3"] = float(self.model.loss_weights.get("ic3", 0))
+            logs[f"{prefix}w_ic4"] = float(self.model.loss_weights.get("ic4", 0))
+            logs[f"{prefix}w_consistency"] = float(self.model.loss_weights.get("consistency", 0))
 
+        # Handle evaluation outputs
         if hasattr(self, '_last_outputs') and self._last_outputs:
             outputs = self._last_outputs
-            losses = outputs["losses"]
+            losses = outputs.get("losses", {})
+            metrics = outputs.get("metrics", {})
             prefix = "eval_" if "eval_loss" in logs else ""
 
             # Individual losses
-            if "mlm" in losses:
-                logs[f"{prefix}loss_mlm"] = float(losses["mlm"])
-            if "ic2" in losses:
-                logs[f"{prefix}loss_ic2"] = float(losses["ic2"])
-            if "ic3" in losses:
-                logs[f"{prefix}loss_ic3"] = float(losses["ic3"])
-            if "ic4" in losses:
-                logs[f"{prefix}loss_ic4"] = float(losses["ic4"])
-            if "consistency" in losses:
-                logs[f"{prefix}loss_consistency"] = float(losses["consistency"])
+            for loss_key, loss_value in losses.items():
+                logs[f"{prefix}loss_{loss_key}"] = float(loss_value)
+
+            # Individual metrics (accuracies)
+            for metric_key, metric_value in metrics.items():
+                logs[f"{prefix}{metric_key}"] = float(metric_value)
 
         # Call parent's log with all arguments
         super().log(logs, *args, **kwargs)
