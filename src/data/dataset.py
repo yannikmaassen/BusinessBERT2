@@ -1,41 +1,107 @@
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from torch.utils.data import Dataset
-from transformers import PreTrainedTokenizerBase
+from transformers import PreTrainedTokenizer
+from tqdm import tqdm
 
 
 class PretrainDataset(Dataset):
-    def __init__(self, examples, tokenizer: PreTrainedTokenizerBase, max_length: int,
-                 idx2: Dict[str, int], idx3: Dict[str, int], idx4: Dict[str, int]):
-        self.examples = examples
+    def __init__(
+            self,
+            raw_examples: List[Dict[str, Any]],
+            tokenizer: PreTrainedTokenizer,
+            max_length: int,
+            indexed_sic2_list: Dict[str, int],
+            indexed_sic3_list: Dict[str, int],
+            indexed_sic4_list: Dict[str, int],
+            preprocess_device: str = "cpu",
+    ):
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.idx2 = idx2
-        self.idx3 = idx3
-        self.idx4 = idx4
+        self.indexed_sic2_list = indexed_sic2_list
+        self.indexed_sic3_list = indexed_sic3_list
+        self.indexed_sic4_list = indexed_sic4_list
 
-    def __len__(self):
-        return len(self.examples)
+        # Force preprocessing on CPU
+        original_device = next(self.tokenizer.parameters()).device if hasattr(self.tokenizer, 'parameters') else None
+
+        # Temporarily move tokenizer to CPU for preprocessing
+        if hasattr(self.tokenizer, 'to'):
+            self.tokenizer = self.tokenizer.to(preprocess_device)
+
+        print("Preprocessing examples...")
+        self.examples = self._preprocess_examples(raw_examples[0:1000])
+        print(f"Created {len(self.examples)} training examples")
+
+        # Move tokenizer back to original device if needed
+        if original_device is not None and hasattr(self.tokenizer, 'to'):
+            self.tokenizer = self.tokenizer.to(original_device)
+
 
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.examples[idx]
-        encoding = self.tokenizer(
-            example.sentence_a if example.sentence_a else "",
-            example.sentence_b if example.sentence_b else None,
-            truncation=True,
-            max_length=self.max_length,
-            padding=False,
-            return_tensors=None,
-        )
-        sic2 = self.idx2.get(example.sic2, -100)
-        sic3 = self.idx3.get(example.sic3, -100)
-        sic4 = self.idx4.get(example.sic4, -100)
 
+        # sic2, sic3 and sic4 are now returned as indices rather than actual SIC codes
         return {
-            "input_ids": encoding["input_ids"],
-            "token_type_ids": encoding.get("token_type_ids", [0] * len(encoding["input_ids"])),
-            "attention_mask": encoding["attention_mask"],
-            "sop_label": example.sop_label,
-            "sic2": sic2,
-            "sic3": sic3,
-            "sic4": sic4,
+            "input_ids": example["input_ids"],
+            "attention_mask": example["attention_mask"],
+            "sic2": self._map_raw_sic_code_to_index(example["sic2"], self.indexed_sic2_list),
+            "sic3": self._map_raw_sic_code_to_index(example["sic3"], self.indexed_sic3_list),
+            "sic4": self._map_raw_sic_code_to_index(example["sic4"], self.indexed_sic4_list),
         }
+
+
+    def _preprocess_examples(self, raw_examples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        processed = []
+
+        for example in tqdm(raw_examples, desc="Preprocessing examples"):
+            sentences = example.get("sentences", [])
+
+            if not sentences:
+                continue
+
+            full_text = " ".join(sentences)
+
+            encoding = self.tokenizer(
+                full_text,
+                truncation=False,
+                padding=False,
+                return_tensors=None,
+                return_special_tokens_mask=True,
+            )
+
+            # If within max_length, process normally
+            if len(encoding["input_ids"]) <= self.max_length:
+                processed.append({
+                    "input_ids": encoding["input_ids"],
+                    "attention_mask": encoding["attention_mask"],
+                    "sic2": example.get("sic2"),
+                    "sic3": example.get("sic3"),
+                    "sic4": example.get("sic4"),
+                })
+            else:
+                for i in range(0, len(encoding["input_ids"]), self.max_length):
+                    chunk_ids = encoding["input_ids"][i:i + self.max_length]
+                    chunk_mask = encoding["attention_mask"][i:i + self.max_length]
+
+                    if len(chunk_ids) < 64:
+                        continue
+
+                    processed.append({
+                        "input_ids": chunk_ids,
+                        "attention_mask": chunk_mask,
+                        "sic2": example.get("sic2"),
+                        "sic3": example.get("sic3"),
+                        "sic4": example.get("sic4"),
+                    })
+
+        return processed
+
+
+    def _map_raw_sic_code_to_index(self, sic_code: Optional[str], indexed_sic_list: Dict[str, int]) -> int:
+        if sic_code is None or sic_code == "NA" or sic_code == "":
+            return -100
+        return indexed_sic_list.get(str(sic_code), -100) # for key=raw SIC code get corresponding index or -100 if not found
+
+
+    def __len__(self) -> int:
+        return len(self.examples)
