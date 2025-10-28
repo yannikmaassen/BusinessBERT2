@@ -60,7 +60,7 @@ class Collator:
         batch_input_ids = [torch.tensor(f["input_ids"], dtype=torch.long) for f in features]
         batch_token_type = [torch.tensor(f["token_type_ids"], dtype=torch.long) for f in features]
         batch_attention = [torch.tensor(f["attention_mask"], dtype=torch.long) for f in features]
-        sop = torch.tensor([f["sop_label"] for f in features], dtype=torch.long)
+        # sop = torch.tensor([f["sop_label"] for f in features], dtype=torch.long)
         sic2 = torch.tensor([f["sic2"] for f in features], dtype=torch.long)
         sic3 = torch.tensor([f["sic3"] for f in features], dtype=torch.long)
         sic4 = torch.tensor([f["sic4"] for f in features], dtype=torch.long)
@@ -77,7 +77,7 @@ class Collator:
             "token_type_ids": token_type_ids,
             "attention_mask": attention_mask,
             "mlm_labels": mlm_labels,
-            "sop_labels": sop,
+            # "sop_labels": sop,
             "sic2": sic2,
             "sic3": sic3,
             "sic4": sic4,
