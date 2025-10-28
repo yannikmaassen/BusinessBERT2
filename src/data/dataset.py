@@ -44,6 +44,7 @@ class PretrainDataset(Dataset):
         return {
             "input_ids": example["input_ids"],
             "attention_mask": example["attention_mask"],
+            "token_type_ids": example["token_type_ids"],
             "sic2": self._map_raw_sic_code_to_index(example["sic2"], self.indexed_sic2_list),
             "sic3": self._map_raw_sic_code_to_index(example["sic3"], self.indexed_sic3_list),
             "sic4": self._map_raw_sic_code_to_index(example["sic4"], self.indexed_sic4_list),
@@ -74,6 +75,7 @@ class PretrainDataset(Dataset):
                 processed.append({
                     "input_ids": encoding["input_ids"],
                     "attention_mask": encoding["attention_mask"],
+                    "token_type_ids": encoding["token_type_ids"],
                     "sic2": example.get("sic2"),
                     "sic3": example.get("sic3"),
                     "sic4": example.get("sic4"),
@@ -82,6 +84,7 @@ class PretrainDataset(Dataset):
                 for i in range(0, len(encoding["input_ids"]), self.max_length):
                     chunk_ids = encoding["input_ids"][i:i + self.max_length]
                     chunk_mask = encoding["attention_mask"][i:i + self.max_length]
+                    chunk_types = encoding["token_type_ids"][i:i + self.max_length]
 
                     if len(chunk_ids) < 64:
                         continue
@@ -89,6 +92,7 @@ class PretrainDataset(Dataset):
                     processed.append({
                         "input_ids": chunk_ids,
                         "attention_mask": chunk_mask,
+                        "token_type_ids": chunk_types,
                         "sic2": example.get("sic2"),
                         "sic3": example.get("sic3"),
                         "sic4": example.get("sic4"),
