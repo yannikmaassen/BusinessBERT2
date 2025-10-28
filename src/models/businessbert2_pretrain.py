@@ -53,9 +53,29 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.bert = BertForPreTraining(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
-        self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
-        self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
+        # self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
+        # self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
+        # self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
+
+        # With MLP heads:
+        self.head_sic2 = nn.Sequential(
+            nn.Linear(config.hidden_size, 256),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(256, n_sic2_classes)
+        )
+        self.head_sic3 = nn.Sequential(
+            nn.Linear(config.hidden_size, 256),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(256, n_sic3_classes)
+        )
+        self.head_sic4 = nn.Sequential(
+            nn.Linear(config.hidden_size, 256),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(256, n_sic4_classes)
+        )
 
         # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
