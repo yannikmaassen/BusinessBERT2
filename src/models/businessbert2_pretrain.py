@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import BertConfig, BertPreTrainedModel, BertForPreTraining
+from src.training.metrics import mlm_accuracy, top1_accuracy
 
 
 def _kl_div(predicted_log, target, eps: float = 1e-8):
@@ -53,29 +54,29 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.bert = BertForPreTraining(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        # self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
-        # self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
-        # self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
+        self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
+        self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
+        self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
 
         # With MLP heads:
-        self.head_sic2 = nn.Sequential(
-            nn.Linear(config.hidden_size, 256),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, n_sic2_classes)
-        )
-        self.head_sic3 = nn.Sequential(
-            nn.Linear(config.hidden_size, 256),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, n_sic3_classes)
-        )
-        self.head_sic4 = nn.Sequential(
-            nn.Linear(config.hidden_size, 256),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(256, n_sic4_classes)
-        )
+        # self.head_sic2 = nn.Sequential(
+        #     nn.Linear(config.hidden_size, 256),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.1),
+        #     nn.Linear(256, n_sic2_classes)
+        # )
+        # self.head_sic3 = nn.Sequential(
+        #     nn.Linear(config.hidden_size, 256),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.1),
+        #     nn.Linear(256, n_sic3_classes)
+        # )
+        # self.head_sic4 = nn.Sequential(
+        #     nn.Linear(config.hidden_size, 256),
+        #     nn.ReLU(),
+        #     nn.Dropout(0.1),
+        #     nn.Linear(256, n_sic4_classes)
+        # )
 
         # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
@@ -121,11 +122,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             total_loss = total_loss + self.loss_weights.get("mlm", 1.0) * mlm_loss
 
             # MLM accuracy (only on masked tokens, ignore -100)
-            mask = mlm_labels != -100
-            if mask.any():
-                predictions = mlm_logits.argmax(dim=-1)
-                correct = (predictions == mlm_labels) & mask
-                metrics["mlm_accuracy"] = correct.sum().float() / mask.sum().float()
+            correct, total = mlm_accuracy(mlm_logits, mlm_labels)
+            if total > 0:
+                metrics["mlm_accuracy"] = torch.tensor(correct / total)
 
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
@@ -134,11 +133,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             total_loss += self.loss_weights.get("ic2", 1.0) * ic2_loss
 
             # SIC2 accuracy
-            mask = sic2 != -100
-            if mask.any():
-                predictions = sic2_logits.argmax(dim=-1)
-                correct = (predictions == sic2) & mask
-                metrics["ic2_accuracy"] = correct.sum().float() / mask.sum().float()
+            correct, total = top1_accuracy(sic2_logits, sic2)
+            if total > 0:
+                metrics["ic2_accuracy"] = torch.tensor(correct / total)
 
         if sic3_logits is not None and sic3 is not None:
             ic3_loss = self.cross_entropy(sic3_logits, sic3)
@@ -146,11 +143,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             total_loss += self.loss_weights.get("ic3", 0.8) * ic3_loss
 
             # SIC3 accuracy
-            mask = sic3 != -100
-            if mask.any():
-                predictions = sic3_logits.argmax(dim=-1)
-                correct = (predictions == sic3) & mask
-                metrics["ic3_accuracy"] = correct.sum().float() / mask.sum().float()
+            correct, total = top1_accuracy(sic3_logits, sic3)
+            if total > 0:
+                metrics["ic3_accuracy"] = torch.tensor(correct / total)
 
         if sic4_logits is not None and sic4 is not None:
             ic4_loss = self.cross_entropy(sic4_logits, sic4)
@@ -158,11 +153,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             total_loss += self.loss_weights.get("ic4", 0.5) * ic4_loss
 
             # SIC4 accuracy
-            mask = sic4 != -100
-            if mask.any():
-                predictions = sic4_logits.argmax(dim=-1)
-                correct = (predictions == sic4) & mask
-                metrics["ic4_accuracy"] = correct.sum().float() / mask.sum().float()
+            correct, total = top1_accuracy(sic4_logits, sic4)
+            if total > 0:
+                metrics["ic4_accuracy"] = torch.tensor(correct / total)
 
         # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
         have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (
