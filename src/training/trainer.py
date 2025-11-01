@@ -10,13 +10,6 @@ class MultiTaskTrainer(Trainer):
         self.total_steps = total_steps
         self.current_step = 0
 
-        # SIC code statistics tracking
-        self.sic_stats = {
-            'total_samples': 0,
-            'sic2_invalid': 0,
-            'sic3_invalid': 0,
-            'sic4_invalid': 0,
-        }
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
@@ -63,18 +56,7 @@ class MultiTaskTrainer(Trainer):
     #     """
     #     Override to handle multi-task outputs and dynamic loss weights.
     #     """
-    #     # Track SIC code statistics
     #     if model.training:
-    #         batch_size = inputs['input_ids'].size(0)
-    #         self.sic_stats['total_samples'] += batch_size
-    #
-    #         if 'sic2' in inputs:
-    #             self.sic_stats['sic2_invalid'] += (inputs['sic2'] == -100).sum().item()
-    #         if 'sic3' in inputs:
-    #             self.sic_stats['sic3_invalid'] += (inputs['sic3'] == -100).sum().item()
-    #         if 'sic4' in inputs:
-    #             self.sic_stats['sic4_invalid'] += (inputs['sic4'] == -100).sum().item()
-    #
     #         # Log statistics every 100 steps
     #         if self.current_step > 0 and self.current_step % 100 == 0:
     #             total = self.sic_stats['total_samples']
