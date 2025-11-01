@@ -48,6 +48,7 @@ def main():
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(int(config.get("seed", 42)))
+    tokenizer = setup_tokenizer(config["base_tokenizer"])
 
     use_wandb = (config.get("report_to", "").lower() == "wandb")
     wb = None
@@ -75,8 +76,6 @@ def main():
         random_state=config.get("seed", 42),
     )
 
-    tokenizer = setup_tokenizer(config["base_tokenizer"])
-
     taxonomy_maps = build_taxonomy_maps(dataset, config["field_sic2"], config["field_sic3"], config["field_sic4"])
     print(
         f"SIC sizes: "
@@ -89,9 +88,7 @@ def main():
     train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
     val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
 
-    data_collator = Collator(
-        tokenizer=tokenizer
-    )
+    data_collator = Collator(tokenizer=tokenizer)
 
     # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

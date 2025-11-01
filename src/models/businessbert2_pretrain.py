@@ -6,18 +6,20 @@ from transformers import BertConfig, BertPreTrainedModel, BertForPreTraining
 from src.training.metrics import mlm_accuracy, top1_accuracy
 
 
-def _kl_div(predicted_log, target, eps: float = 1e-8):
+def _kl_divergence(predicted_logits, implied_probs, eps: float = 1e-8):
     """
-    Forward KL: KL(predicted || target).
-    Encourages predicted to match target (implied).
+    Forward KL: KL(implied || predicted). --> Order of arguments differs from PyTorch implementation.
+    Soft-label cross-entropy to encourage predictions to match the implied target.
     """
-    target_safe = target.clamp(min=eps)
-    return F.kl_div(predicted_log, target_safe, reduction="batchmean")
+    implied_probs = implied_probs.clamp(min=eps)
+    implied_probs = implied_probs / implied_probs.sum(dim=-1, keepdim=True) # renormalize
+    log_predicted_logits = F.log_softmax(predicted_logits, dim=-1)
+
+    return F.kl_div(input=log_predicted_logits, target=implied_probs, reduction="batchmean")
 
 
 def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
     # Create M43 and M42 matrices from A43 and A32
-
     if A43.numel():
         M43 = A43.clone().to(torch.float32).contiguous()
     else:
@@ -89,6 +91,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
         self.init_weights()
 
+
     def forward(
             self,
             input_ids,
@@ -119,7 +122,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if mlm_labels is not None:
             mlm_loss = self.cross_entropy(mlm_logits.view(-1, mlm_logits.size(-1)), mlm_labels.view(-1))
             losses["mlm"] = mlm_loss
-            total_loss = total_loss + self.loss_weights.get("mlm", 1.0) * mlm_loss
+            total_loss += self.loss_weights.get("mlm", 1.0) * mlm_loss
 
             # MLM accuracy (only on masked tokens, ignore -100)
             correct, total = mlm_accuracy(mlm_logits, mlm_labels)
@@ -158,29 +161,39 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 metrics["ic4_accuracy"] = torch.tensor(correct / total)
 
         # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
-        have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (
-                    self.M43.numel() > 0)
-        have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (
-                    self.M42.numel() > 0)
+        have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (self.M43.numel() > 0)
+        have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (self.M42.numel() > 0)
 
         if have_m43 or have_m42:
             parts = []
 
-            p4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
+            prob_4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
 
             if have_m43:
                 # implied SIC3 distribution by summing SIC4 children
-                implied_p3 = torch.matmul(p4, self.M43)  # [B, n3]
-                log_p3 = F.log_softmax(sic3_logits, dim=-1)
-                # KL(predicted || implied) to encourage predicted to match implied
-                parts.append(_kl_div(log_p3, implied_p3))
+                implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
+
+                print("prob_4:\n", prob_4)
+                print("M43:\n", self.M43)
+                print("implied_p3 (matmul):\n", implied_p3)
+
+                # manual verification (explicit sums)
+                manual = torch.stack([
+                    torch.tensor([prob_4[0, 0] + prob_4[0, 1], prob_4[0, 2], prob_4[0, 3]]),
+                    torch.tensor([prob_4[1, 0] + prob_4[1, 1], prob_4[1, 2], prob_4[1, 3]]),
+                ])
+                print("implied_p3 (manual sums):\n", manual)
+
+                # They should be equal
+                print("equal:", torch.allclose(implied_p3, manual))
+
+
+                parts.append(_kl_divergence(sic3_logits, implied_p3))
 
             if have_m42:
                 # implied SIC2 distribution by summing SIC4 children
-                implied_p2 = torch.matmul(p4, self.M42)  # [B, n2]
-                log_p2 = F.log_softmax(sic2_logits, dim=-1)
-                # KL(predicted || implied) to encourage predicted to match implied
-                parts.append(_kl_div(log_p2, implied_p2))
+                implied_p2 = torch.matmul(prob_4, self.M42)  # [B, n2]
+                parts.append(_kl_divergence(sic2_logits, implied_p2))
 
             if parts:
                 consistency_loss = torch.stack(parts).mean()
