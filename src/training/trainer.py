@@ -35,13 +35,6 @@ class MultiTaskTrainer(Trainer):
             for key, value in metrics_dict.items():
                 log_dict[f"train/{key}"] = value.item()
 
-            # Add current loss weights
-            if hasattr(model, 'loss_weights'):
-                log_dict["train/w_ic2"] = float(model.loss_weights.get("ic2", 0))
-                log_dict["train/w_ic3"] = float(model.loss_weights.get("ic3", 0))
-                log_dict["train/w_ic4"] = float(model.loss_weights.get("ic4", 0))
-                log_dict["train/w_consistency"] = float(model.loss_weights.get("consistency", 0))
-
             # Log to WandB
             wandb.log(log_dict, step=self.state.global_step)
 
@@ -53,14 +46,6 @@ class MultiTaskTrainer(Trainer):
 
 
     def log(self, logs, *args, **kwargs):
-        # Add current loss weights (for both train and eval)
-        if hasattr(self.model, 'loss_weights'):
-            prefix = "eval_" if "eval_loss" in logs else ""
-            logs[f"{prefix}w_ic2"] = float(self.model.loss_weights.get("ic2", 0))
-            logs[f"{prefix}w_ic3"] = float(self.model.loss_weights.get("ic3", 0))
-            logs[f"{prefix}w_ic4"] = float(self.model.loss_weights.get("ic4", 0))
-            logs[f"{prefix}w_consistency"] = float(self.model.loss_weights.get("consistency", 0))
-
         # Handle evaluation outputs
         if hasattr(self, '_last_outputs') and self._last_outputs:
             outputs = self._last_outputs
