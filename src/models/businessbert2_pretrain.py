@@ -173,18 +173,18 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 # implied SIC3 distribution by summing SIC4 children
                 implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
 
+                # manual verification (explicit sums) — create on same dtype/device as prob_4
+                manual = torch.stack([
+                    torch.tensor([prob_4[0, 0] + prob_4[0, 1], prob_4[0, 2], prob_4[0, 3]],
+                                 dtype=prob_4.dtype, device=prob_4.device),
+                    torch.tensor([prob_4[1, 0] + prob_4[1, 1], prob_4[1, 2], prob_4[1, 3]],
+                                 dtype=prob_4.dtype, device=prob_4.device),
+                ])
+
                 print("prob_4:\n", prob_4)
                 print("M43:\n", self.M43)
                 print("implied_p3 (matmul):\n", implied_p3)
-
-                # manual verification (explicit sums)
-                manual = torch.stack([
-                    torch.tensor([prob_4[0, 0] + prob_4[0, 1], prob_4[0, 2], prob_4[0, 3]]),
-                    torch.tensor([prob_4[1, 0] + prob_4[1, 1], prob_4[1, 2], prob_4[1, 3]]),
-                ])
                 print("implied_p3 (manual sums):\n", manual)
-
-                # They should be equal
                 print("equal:", torch.allclose(implied_p3, manual))
 
                 exit(0)
