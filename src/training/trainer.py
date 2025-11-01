@@ -173,16 +173,16 @@ class MultiTaskTrainer(Trainer):
                     aggregated_metrics[key] = []
                 aggregated_metrics[key].append(value.item())
 
-        # Average all collected metrics
+        # Average all collected metrics - use slash for wandb grouping
         eval_logs = {
-            f"{metric_key_prefix}/total_loss": sum(aggregated_losses) / len(aggregated_losses)
+            "eval/total_loss": sum(aggregated_losses) / len(aggregated_losses)
         }
 
         for key, values in aggregated_metrics.items():
             if values:
-                # Losses get _loss suffix, accuracies already have _accuracy suffix from model
-                suffix = "_loss" if not key.endswith("_accuracy") else ""
-                eval_logs[f"{metric_key_prefix}/{key}{suffix}"] = sum(values) / len(values)
+                # Losses get loss_ prefix, accuracies already have _accuracy suffix from model
+                prefix = "loss_" if not key.endswith("_accuracy") else ""
+                eval_logs[f"eval/{prefix}{key}"] = sum(values) / len(values)
 
         # Store for logging
         self._eval_metrics = eval_logs
