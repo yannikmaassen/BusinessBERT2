@@ -23,6 +23,12 @@ class MultiTaskTrainer(Trainer):
       - Evaluation aggregated keys are prefixed with 'eval/'.
       - Overall scalar loss is logged as 'train/loss' and 'eval/loss'.
     """
+    def __init__(self, *args, **kwargs):
+        # Pop custom args you pass from main()
+        self.taxonomy_maps = kwargs.pop("taxonomy_maps", None)
+        self.total_steps = kwargs.pop("total_steps", None)
+        super().__init__(*args, **kwargs)
+
     # ------------------------
     # TRAINING: per-step logging
     # ------------------------
