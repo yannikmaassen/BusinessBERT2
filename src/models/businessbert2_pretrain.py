@@ -169,14 +169,22 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
             prob_4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
 
+            if sic4 is not None:
+                y4 = F.one_hot(sic4, num_classes=self.head_sic4.out_features).float()
+                implied_p3 = y4 @ self.M43
+                implied_p2 = y4 @ self.M42
+            else:
+                implied_p3 = (F.softmax(sic4_logits, dim=-1) @ self.M43).detach()
+                implied_p2 = (F.softmax(sic4_logits, dim=-1) @ self.M42).detach()
+
             if have_m43:
                 # implied SIC3 distribution by summing SIC4 children
-                implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
+                # implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
                 parts.append(_kl_divergence(sic3_logits, implied_p3))
 
             if have_m42:
                 # implied SIC2 distribution by summing SIC4 children
-                implied_p2 = torch.matmul(prob_4, self.M42)  # [B, n2]
+                # implied_p2 = torch.matmul(prob_4, self.M42)  # [B, n2]
                 parts.append(_kl_divergence(sic2_logits, implied_p2))
 
             if parts:
