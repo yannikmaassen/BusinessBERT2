@@ -31,28 +31,23 @@ class MultiTaskTrainer(Trainer):
 
         loss = outputs["loss"] if isinstance(outputs, dict) and "loss" in outputs else outputs
 
-        # ❗️Do NOT prefix with 'train/' — grouping comes from step key 'train/global_step'
         if isinstance(outputs, dict):
             to_log = {"loss": _to_item(outputs.get("loss", loss))}
-
-            # component losses
             comp_losses = outputs.get("losses", {}) or {}
             for name in ["mlm", "ic2", "ic3", "ic4", "consistency"]:
                 if name in comp_losses:
                     to_log[f"{name}_loss"] = _to_item(comp_losses[name])
-
-            # accuracies
             comp_metrics = outputs.get("metrics", {}) or {}
             for name in ["mlm_accuracy", "ic2_accuracy", "ic3_accuracy", "ic4_accuracy"]:
                 if name in comp_metrics:
                     to_log[name] = _to_item(comp_metrics[name])
 
-            # respect logging_steps
-            should_log_now = True
-            if self.state.global_step is not None and self.args.logging_steps and self.args.logging_steps > 0:
-                should_log_now = (self.state.global_step % self.args.logging_steps == 0)
+            # ensure W&B groups these under "train"
+            to_log["train/global_step"] = int(self.state.global_step)
 
-            if should_log_now:
+            if self.state.global_step is None or self.args.logging_steps == 0:
+                self.log(to_log)
+            elif self.state.global_step % self.args.logging_steps == 0:
                 self.log(to_log)
 
         return (loss, outputs) if return_outputs else loss
@@ -76,7 +71,6 @@ class MultiTaskTrainer(Trainer):
             inputs = self._prepare_inputs(inputs)
             batch_size = next((v.size(0) for v in inputs.values()
                                if isinstance(v, torch.Tensor) and v.dim() > 0), 1)
-
             with self.autocast_smart_context_manager():
                 outputs = model(**inputs)
 
@@ -98,22 +92,23 @@ class MultiTaskTrainer(Trainer):
 
             total_examples += batch_size
 
-        def _avg(k: str) -> Optional[float]:
+        def _avg(k: str):
             return (sums[k] / counts[k]) if counts.get(k, 0) > 0 else None
 
-        # For W&B logging → ❗️no 'eval/' prefix; step key is already 'eval/global_step'
-        to_log = {}
+        # Log to W&B under the "eval" group by providing eval/global_step
+        to_log: Dict[str, float] = {"eval/global_step": int(self.state.global_step)}
         for k in ["loss",
                   "mlm_loss", "ic2_loss", "ic3_loss", "ic4_loss", "consistency_loss",
                   "mlm_accuracy", "ic2_accuracy", "ic3_accuracy", "ic4_accuracy"]:
-            val = _avg(k)
-            if val is not None:
-                to_log[k] = val
-
+            v = _avg(k)
+            if v is not None:
+                to_log[k] = v
         self.log(to_log)
 
-        # For Trainer return/printouts → keep classic 'eval_*' names
-        to_return: Dict[str, float] = {}
+        # Also return classic eval_* keys for console/progress output
+        ret = {
+            "eval_samples": float(total_examples),
+        }
         mapping = {
             "loss": "eval_loss",
             "mlm_loss": "eval_mlm_loss",
@@ -128,7 +123,5 @@ class MultiTaskTrainer(Trainer):
         }
         for k, outk in mapping.items():
             if k in to_log:
-                to_return[outk] = to_log[k]
-
-        to_return["eval_samples"] = float(total_examples)
-        return to_return
+                ret[outk] = to_log[k]
+        return ret
