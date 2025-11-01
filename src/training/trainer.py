@@ -87,18 +87,6 @@ class MultiTaskTrainer(Trainer):
     #
     #     return (loss, outputs) if return_outputs else loss
 
-    # @staticmethod
-    # def _coarse_to_fine_weights(step, total_steps):
-    #     progress = min(max(step / max(1, total_steps), 0.0), 1.0)
-    #     cosine_ramp = 0.5 - 0.5 * math.cos(math.pi * progress)
-    #
-    #     w2 = 0.8 * (1 - cosine_ramp) + 0.2
-    #     w3 = 0.3 + 0.4 * cosine_ramp
-    #     w4 = 0.1 + 0.9 * cosine_ramp
-    #
-    #     total = w2 + w3 + w4
-    #     return w2 / total, w3 / total, w4 / total
-
     # def log(self, logs, *args, **kwargs):
     #     # Add current loss weights (for both train and eval)
     #     prefix = "eval_" if "eval_loss" in logs else ""
@@ -120,15 +108,15 @@ class MultiTaskTrainer(Trainer):
     #     # Call parent's log with all arguments
     #     super().log(logs, *args, **kwargs)
 
-    def log(self, logs, *args, **kwargs):
-        """Override to inject aggregated eval metrics"""
-        # If we have aggregated eval metrics, add them to logs
-        if hasattr(self, '_eval_metrics') and self._eval_metrics:
-            logs.update(self._eval_metrics)
-            del self._eval_metrics  # Clear after logging
-
-        # Call parent's log
-        super().log(logs, *args, **kwargs)
+    # def log(self, logs, *args, **kwargs):
+    #     """Override to inject aggregated eval metrics"""
+    #     # If we have aggregated eval metrics, add them to logs
+    #     if hasattr(self, '_eval_metrics') and self._eval_metrics:
+    #         logs.update(self._eval_metrics)
+    #         del self._eval_metrics  # Clear after logging
+    #
+    #     # Call parent's log
+    #     super().log(logs, *args, **kwargs)
 
     # def evaluation_loop(self, dataloader, description, prediction_loss_only=None, ignore_keys=None, metric_key_prefix="eval"):
     #     """Override to aggregate metrics across evaluation batches"""
@@ -193,3 +181,15 @@ class MultiTaskTrainer(Trainer):
         )
 
         return output
+
+    # @staticmethod
+    # def _coarse_to_fine_weights(step, total_steps):
+    #     progress = min(max(step / max(1, total_steps), 0.0), 1.0)
+    #     cosine_ramp = 0.5 - 0.5 * math.cos(math.pi * progress)
+    #
+    #     w2 = 0.8 * (1 - cosine_ramp) + 0.2
+    #     w3 = 0.3 + 0.4 * cosine_ramp
+    #     w4 = 0.1 + 0.9 * cosine_ramp
+    #
+    #     total = w2 + w3 + w4
+    #     return w2 / total, w3 / total, w4 / total
