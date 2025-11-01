@@ -9,7 +9,7 @@ import yaml
 
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 
-from src.training.trainer import MultiTaskTrainer
+from src.training.trainer_test import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
 from src.data import PretrainDataset, Collator
 from src.models import BusinessBERT2Pretrain
