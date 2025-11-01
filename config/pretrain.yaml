@@ -20,7 +20,7 @@ save_total_limit: 2
 save_strategy: steps
 save_steps: 500
 eval_strategy: steps
-eval_steps: 500
+eval_steps: 100
 val_ratio: 0.1
 precision: bf16
 
