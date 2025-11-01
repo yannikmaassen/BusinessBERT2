@@ -187,6 +187,8 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 # They should be equal
                 print("equal:", torch.allclose(implied_p3, manual))
 
+                exit(0)
+
 
                 parts.append(_kl_divergence(sic3_logits, implied_p3))
 

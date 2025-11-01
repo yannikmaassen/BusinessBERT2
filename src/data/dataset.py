@@ -29,7 +29,7 @@ class PretrainDataset(Dataset):
             self.tokenizer = self.tokenizer.to(preprocess_device)
 
         print("Preprocessing examples...")
-        self.examples = self._preprocess_examples(raw_examples)
+        self.examples = self._preprocess_examples(raw_examples[0:100])
         print(f"Created {len(self.examples)} training examples")
 
         # Move tokenizer back to original device if needed
