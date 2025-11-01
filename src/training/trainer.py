@@ -44,25 +44,28 @@ class MultiTaskTrainer(Trainer):
 
         return (loss, outputs) if return_outputs else loss
 
-
     def log(self, logs, *args, **kwargs):
-        # Handle evaluation outputs
-        if hasattr(self, '_last_outputs') and self._last_outputs:
-            outputs = self._last_outputs
-            losses = outputs.get("losses", {})
-            metrics = outputs.get("metrics", {})
-            prefix = "eval_" if "eval_loss" in logs else ""
-
-            # Individual losses
-            for loss_key, loss_value in losses.items():
-                logs[f"{prefix}loss_{loss_key}"] = float(loss_value)
-
-            # Individual metrics (accuracies)
-            for metric_key, metric_value in metrics.items():
-                logs[f"{prefix}{metric_key}"] = float(metric_value)
-
-        # Call parent's log with all arguments
+        # Just call parent's log - evaluation is now handled in evaluation_loop
         super().log(logs, *args, **kwargs)
+
+    # def log(self, logs, *args, **kwargs):
+    #     # Handle evaluation outputs
+    #     if hasattr(self, '_last_outputs') and self._last_outputs:
+    #         outputs = self._last_outputs
+    #         losses = outputs.get("losses", {})
+    #         metrics = outputs.get("metrics", {})
+    #         prefix = "eval_" if "eval_loss" in logs else ""
+    #
+    #         # Individual losses
+    #         for loss_key, loss_value in losses.items():
+    #             logs[f"{prefix}loss_{loss_key}"] = float(loss_value)
+    #
+    #         # Individual metrics (accuracies)
+    #         for metric_key, metric_value in metrics.items():
+    #             logs[f"{prefix}{metric_key}"] = float(metric_value)
+    #
+    #     # Call parent's log with all arguments
+    #     super().log(logs, *args, **kwargs)
 
 
     def evaluation_loop(self, dataloader, description, prediction_loss_only=None, ignore_keys=None,
@@ -72,6 +75,33 @@ class MultiTaskTrainer(Trainer):
         output = super().evaluation_loop(
             dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix
         )
+
+        print("############### eval output ###############")
+        print(output)
+        print("##############################")
+
+        # Build log dict for evaluation metrics
+        if self.args.report_to and "wandb" in self.args.report_to:
+            log_dict = {}
+
+            if output.metrics.get(f"{metric_key_prefix}_loss") is not None:
+                log_dict[f"{metric_key_prefix}/loss"] = output.metrics[f"{metric_key_prefix}_loss"]
+
+            # Add individual losses (loss_X format)
+            for key, value in output.metrics.items():
+                if key.startswith(f"{metric_key_prefix}_loss_"):
+                    loss_name = key.replace(f"{metric_key_prefix}_loss_", "")
+                    log_dict[f"{metric_key_prefix}/loss_{loss_name}"] = value
+
+            # Add other metrics (accuracies, etc.)
+            for key, value in output.metrics.items():
+                if key.startswith(metric_key_prefix) and not key.startswith(f"{metric_key_prefix}_loss"):
+                    metric_name = key.replace(f"{metric_key_prefix}_", "")
+                    log_dict[f"{metric_key_prefix}/{metric_name}"] = value
+
+            # Log to WandB
+            if log_dict:
+                wandb.log(log_dict, step=self.state.global_step)
 
         # Extract aggregated metrics from the last batch
         return output
