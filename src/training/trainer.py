@@ -10,6 +10,7 @@ class MultiTaskTrainer(Trainer):
         self.taxonomy_maps = taxonomy_maps
         self.total_steps = total_steps
         self.current_step = 0
+        self._eval_metrics = {}
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         """
@@ -154,28 +155,28 @@ class MultiTaskTrainer(Trainer):
                     aggregated_metrics[key] = []
                 aggregated_metrics[key].append(value.item())
 
-            # Collect metrics (accuracies) - model already calculated them
+            # Collect metrics (accuracies)
             metrics = outputs.get("metrics", {})
             for key, value in metrics.items():
                 if key not in aggregated_metrics:
                     aggregated_metrics[key] = []
                 aggregated_metrics[key].append(value.item())
 
-        # Average all collected metrics - use slash for wandb grouping
+        # Average all collected metrics
         eval_logs = {
             "eval/total_loss": sum(aggregated_losses) / len(aggregated_losses)
         }
 
         for key, values in aggregated_metrics.items():
             if values:
-                # Losses get loss_ prefix, accuracies already have _accuracy suffix from model
                 prefix = "loss_" if not key.endswith("_accuracy") else ""
                 eval_logs[f"eval/{prefix}{key}"] = sum(values) / len(values)
 
-        # Store for logging
-        self._eval_metrics = eval_logs
+        # Log directly to wandb instead of going through Trainer's log system
+        if self.args.report_to and "wandb" in self.args.report_to:
+            wandb.log(eval_logs, step=self.state.global_step)
 
-        # Call parent to get standard output format
+        # Call parent but don't store metrics for later
         output = super().evaluation_loop(
             dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix
         )

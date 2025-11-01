@@ -148,7 +148,6 @@ def main():
 
     # Train
     trainer.train()
-    trainer.evaluate()
 
     model.save_pretrained(config["save_dir"], safe_serialization=bool(config.get("safe_serialization", False)))
     tokenizer.save_pretrained(config["save_dir"])
