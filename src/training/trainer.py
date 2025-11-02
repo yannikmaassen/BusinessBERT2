@@ -25,8 +25,6 @@ class MultiTaskTrainer(Trainer):
             # Extract individual loss components and metrics
             loss_dict = outputs.get("losses", {})
             metrics_dict = outputs.get("metrics", {})
-
-            # Prepare logging dict
             log_dict = {"train/total_loss": loss.item()}
 
             # Add individual losses
