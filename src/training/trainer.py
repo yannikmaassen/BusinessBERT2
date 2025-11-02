@@ -51,7 +51,7 @@ class MultiTaskTrainer(Trainer):
         total_loss = 0.0
         total_losses = {}
         total_metrics = {}
-        loss_counts = {}  # Track how many valid samples per loss
+        loss_counts = {}
         num_batches = 0
 
         # Iterate through evaluation batches
@@ -110,7 +110,7 @@ class MultiTaskTrainer(Trainer):
             for key in total_metrics.keys():
                 log_dict[f"{metric_key_prefix}/{key}"] = metrics[f"{metric_key_prefix}_{key}"]
 
-            if log_dict:  # Only log if we have valid values
+            if log_dict:
                 wandb.log(log_dict, step=self.state.global_step, commit=False)
 
         # Return EvalLoopOutput for compatibility
