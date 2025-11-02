@@ -111,7 +111,7 @@ class MultiTaskTrainer(Trainer):
                 log_dict[f"{metric_key_prefix}/{key}"] = metrics[f"{metric_key_prefix}_{key}"]
 
             if log_dict:  # Only log if we have valid values
-                wandb.log(log_dict, step=self.state.global_step)
+                wandb.log(log_dict, step=self.state.global_step, commit=False)
 
         # Return EvalLoopOutput for compatibility
         return EvalLoopOutput(
