@@ -142,8 +142,8 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         data_collator=data_collator,
-        taxonomy_maps=taxonomy_maps,
-        total_steps=total_steps,
+        # taxonomy_maps=taxonomy_maps,
+        # total_steps=total_steps,
     )
 
     # Train
