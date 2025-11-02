@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 import torch
 import yaml
 
-from transformers import AutoTokenizer, BertConfig, TrainingArguments, Trainer
+from transformers import AutoTokenizer, BertConfig, TrainingArguments
 
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
@@ -136,14 +136,14 @@ def main():
     )
 
     # Initialize trainer
-    trainer = Trainer(
+    trainer = MultiTaskTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         data_collator=data_collator,
-        # taxonomy_maps=taxonomy_maps,
-        # total_steps=total_steps,
+        taxonomy_maps=taxonomy_maps,
+        total_steps=total_steps,
     )
 
     # Train
