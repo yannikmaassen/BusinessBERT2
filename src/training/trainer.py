@@ -1,5 +1,7 @@
+from transformers.trainer_utils import EvalLoopOutput
 from transformers import Trainer
 import wandb
+import torch
 
 
 class MultiTaskTrainer(Trainer):
@@ -38,70 +40,72 @@ class MultiTaskTrainer(Trainer):
             # Log to WandB
             wandb.log(log_dict, step=self.state.global_step)
 
-        # Store outputs for evaluation logging
-        if not model.training:
-            self._last_outputs = outputs
-
         return (loss, outputs) if return_outputs else loss
 
-    def log(self, logs, *args, **kwargs):
-        # Just call parent's log - evaluation is now handled in evaluation_loop
-        super().log(logs, *args, **kwargs)
+    def evaluation_loop(self, dataloader, description, prediction_loss_only=None, ignore_keys=None, metric_key_prefix="eval"):
+        """Custom evaluation loop to aggregate metrics"""
+        model = self._wrap_model(self.model, training=False, dataloader=dataloader)
+        model.eval()
 
-    # def log(self, logs, *args, **kwargs):
-    #     # Handle evaluation outputs
-    #     if hasattr(self, '_last_outputs') and self._last_outputs:
-    #         outputs = self._last_outputs
-    #         losses = outputs.get("losses", {})
-    #         metrics = outputs.get("metrics", {})
-    #         prefix = "eval_" if "eval_loss" in logs else ""
-    #
-    #         # Individual losses
-    #         for loss_key, loss_value in losses.items():
-    #             logs[f"{prefix}loss_{loss_key}"] = float(loss_value)
-    #
-    #         # Individual metrics (accuracies)
-    #         for metric_key, metric_value in metrics.items():
-    #             logs[f"{prefix}{metric_key}"] = float(metric_value)
-    #
-    #     # Call parent's log with all arguments
-    #     super().log(logs, *args, **kwargs)
+        # Initialize accumulators
+        total_loss = 0.0
+        total_losses = {}
+        total_metrics = {}
+        num_batches = 0
 
+        # Iterate through evaluation batches
+        for step, inputs in enumerate(dataloader):
+            inputs = self._prepare_inputs(inputs)
 
-    def evaluation_loop(self, dataloader, description, prediction_loss_only=None, ignore_keys=None,
-                        metric_key_prefix="eval"):
-        """Override to aggregate metrics across evaluation batches"""
-        # Call parent evaluation
-        output = super().evaluation_loop(
-            dataloader, description, prediction_loss_only, ignore_keys, metric_key_prefix
-        )
+            # Forward pass
+            with torch.no_grad():
+                outputs = model(**inputs)
 
-        print("############### eval output ###############")
-        print(output)
-        print("##############################")
+            # Accumulate main loss
+            if outputs.get("loss") is not None:
+                total_loss += outputs["loss"].item()
 
-        # Build log dict for evaluation metrics
+            # Accumulate individual losses
+            for key, value in outputs.get("losses", {}).items():
+                if key not in total_losses:
+                    total_losses[key] = 0.0
+                total_losses[key] += value.item()
+
+            # Accumulate metrics
+            for key, value in outputs.get("metrics", {}).items():
+                if key not in total_metrics:
+                    total_metrics[key] = 0.0
+                total_metrics[key] += value.item()
+
+            num_batches += 1
+
+        # Calculate averages
+        metrics = {}
+        metrics[f"{metric_key_prefix}_loss"] = total_loss / num_batches if num_batches > 0 else float('nan')
+
+        for key, value in total_losses.items():
+            metrics[f"{metric_key_prefix}_loss_{key}"] = value / num_batches if num_batches > 0 else float('nan')
+
+        for key, value in total_metrics.items():
+            metrics[f"{metric_key_prefix}_{key}"] = value / num_batches if num_batches > 0 else float('nan')
+
+        # Log to WandB
         if self.args.report_to and "wandb" in self.args.report_to:
             log_dict = {}
+            log_dict[f"{metric_key_prefix}/total_loss"] = metrics[f"{metric_key_prefix}_loss"]
 
-            if output.metrics.get(f"{metric_key_prefix}_loss") is not None:
-                log_dict[f"{metric_key_prefix}/loss"] = output.metrics[f"{metric_key_prefix}_loss"]
+            for key, value in total_losses.items():
+                log_dict[f"{metric_key_prefix}/loss_{key}"] = metrics[f"{metric_key_prefix}_loss_{key}"]
 
-            # Add individual losses (loss_X format)
-            for key, value in output.metrics.items():
-                if key.startswith(f"{metric_key_prefix}_loss_"):
-                    loss_name = key.replace(f"{metric_key_prefix}_loss_", "")
-                    log_dict[f"{metric_key_prefix}/loss_{loss_name}"] = value
+            for key, value in total_metrics.items():
+                log_dict[f"{metric_key_prefix}/{key}"] = metrics[f"{metric_key_prefix}_{key}"]
 
-            # Add other metrics (accuracies, etc.)
-            for key, value in output.metrics.items():
-                if key.startswith(metric_key_prefix) and not key.startswith(f"{metric_key_prefix}_loss"):
-                    metric_name = key.replace(f"{metric_key_prefix}_", "")
-                    log_dict[f"{metric_key_prefix}/{metric_name}"] = value
+            wandb.log(log_dict, step=self.state.global_step)
 
-            # Log to WandB
-            if log_dict:
-                wandb.log(log_dict, step=self.state.global_step)
-
-        # Extract aggregated metrics from the last batch
-        return output
+        # Return EvalLoopOutput for compatibility
+        return EvalLoopOutput(
+            predictions=None,
+            label_ids=None,
+            metrics=metrics,
+            num_samples=len(dataloader.dataset)
+        )
