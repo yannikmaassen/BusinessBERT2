@@ -47,10 +47,11 @@ class MultiTaskTrainer(Trainer):
         model = self._wrap_model(self.model, training=False, dataloader=dataloader)
         model.eval()
 
-        # Initialize accumulators
+        # Initialize accumulators with counters for each loss
         total_loss = 0.0
         total_losses = {}
         total_metrics = {}
+        loss_counts = {}  # Track how many valid samples per loss
         num_batches = 0
 
         # Iterate through evaluation batches
@@ -61,15 +62,18 @@ class MultiTaskTrainer(Trainer):
             with torch.no_grad():
                 outputs = model(**inputs)
 
-            # Accumulate main loss
-            if outputs.get("loss") is not None:
+            # Accumulate main loss (only if valid)
+            if outputs.get("loss") is not None and not torch.isnan(outputs["loss"]):
                 total_loss += outputs["loss"].item()
 
-            # Accumulate individual losses
+            # Accumulate individual losses (skip nan values)
             for key, value in outputs.get("losses", {}).items():
-                if key not in total_losses:
-                    total_losses[key] = 0.0
-                total_losses[key] += value.item()
+                if not torch.isnan(value):
+                    if key not in total_losses:
+                        total_losses[key] = 0.0
+                        loss_counts[key] = 0
+                    total_losses[key] += value.item()
+                    loss_counts[key] += 1
 
             # Accumulate metrics
             for key, value in outputs.get("metrics", {}).items():
@@ -83,24 +87,31 @@ class MultiTaskTrainer(Trainer):
         metrics = {}
         metrics[f"{metric_key_prefix}_loss"] = total_loss / num_batches if num_batches > 0 else float('nan')
 
+        # Use individual counts for each loss type
         for key, value in total_losses.items():
-            metrics[f"{metric_key_prefix}_loss_{key}"] = value / num_batches if num_batches > 0 else float('nan')
+            count = loss_counts.get(key, 0)
+            metrics[f"{metric_key_prefix}_loss_{key}"] = value / count if count > 0 else float('nan')
 
         for key, value in total_metrics.items():
             metrics[f"{metric_key_prefix}_{key}"] = value / num_batches if num_batches > 0 else float('nan')
 
-        # Log to WandB
+        # Log to WandB (skip nan values)
         if self.args.report_to and "wandb" in self.args.report_to:
             log_dict = {}
-            log_dict[f"{metric_key_prefix}/total_loss"] = metrics[f"{metric_key_prefix}_loss"]
 
-            for key, value in total_losses.items():
-                log_dict[f"{metric_key_prefix}/loss_{key}"] = metrics[f"{metric_key_prefix}_loss_{key}"]
+            if not torch.isnan(torch.tensor(metrics[f"{metric_key_prefix}_loss"])):
+                log_dict[f"{metric_key_prefix}/total_loss"] = metrics[f"{metric_key_prefix}_loss"]
 
-            for key, value in total_metrics.items():
+            for key in total_losses.keys():
+                metric_value = metrics[f"{metric_key_prefix}_loss_{key}"]
+                if not torch.isnan(torch.tensor(metric_value)):
+                    log_dict[f"{metric_key_prefix}/loss_{key}"] = metric_value
+
+            for key in total_metrics.keys():
                 log_dict[f"{metric_key_prefix}/{key}"] = metrics[f"{metric_key_prefix}_{key}"]
 
-            wandb.log(log_dict, step=self.state.global_step)
+            if log_dict:  # Only log if we have valid values
+                wandb.log(log_dict, step=self.state.global_step)
 
         # Return EvalLoopOutput for compatibility
         return EvalLoopOutput(
