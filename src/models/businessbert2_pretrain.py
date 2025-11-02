@@ -15,7 +15,7 @@ def _kl_divergence(predicted_logits, implied_probs, eps: float = 1e-8):
     implied_probs = implied_probs / implied_probs.sum(dim=-1, keepdim=True) # renormalize
     log_predicted_logits = F.log_softmax(predicted_logits, dim=-1)
 
-    return F.kl_div(input=log_predicted_logits, target=implied_probs, reduction="batchmean")
+    return F.kl_div(input=log_predicted_logits, target=implied_probs, reduction="mean")
 
 
 def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
