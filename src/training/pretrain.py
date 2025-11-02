@@ -39,8 +39,6 @@ def setup_tokenizer(base_tokenizer: str):
 
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TensorFlow logging
-    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"  # Disable oneDNN messages
     args = parse_cli_args()
 
     config = load_config(args.config, args.data, args.report_to)
