@@ -2,13 +2,10 @@ import os
 import random
 from typing import Dict
 import wandb
-
 from sklearn.model_selection import train_test_split
 import torch
 import yaml
-
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
-
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
 from src.data import PretrainDataset, Collator
@@ -42,6 +39,8 @@ def setup_tokenizer(base_tokenizer: str):
 
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TensorFlow logging
+    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"  # Disable oneDNN messages
     args = parse_cli_args()
 
     config = load_config(args.config, args.data, args.report_to)
