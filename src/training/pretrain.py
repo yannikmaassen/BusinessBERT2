@@ -107,13 +107,15 @@ def main():
         wandb.watch(model, log="gradients", log_freq=max(1, int(config.get("logging_steps", 50))))
 
     # Calculate total steps
-    steps_per_epoch = len(train_dataset) // config["train_batch_size"]
-    total_steps = config["num_train_epochs"] * steps_per_epoch
+    # steps_per_epoch = len(train_dataset) // config["train_batch_size"]
+    # total_steps = config["num_train_epochs"] * steps_per_epoch
+    total_steps = config["max_steps"]
 
     # Training arguments
     training_args = TrainingArguments(
         output_dir=config["save_dir"],
         num_train_epochs=config["num_train_epochs"],
+        max_steps=total_steps,
         per_device_train_batch_size=config["train_batch_size"],
         per_device_eval_batch_size=config["val_batch_size"],
         warmup_steps=config["num_warmup_steps"],
