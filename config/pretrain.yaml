@@ -6,32 +6,23 @@ max_seq_len: 512
 train_batch_size: 128
 val_batch_size: 128
 learning_rate: !!float 1e-4
-adam_epsilon: !!float 1e-8
 num_train_epochs: 1
 max_steps: 1000000
-num_warmup_steps: 2000
-num_training_steps: 1000
+num_warmup_steps: 10000
 num_workers: 4
 weight_decay: 0.01
 gradient_accumulation_steps: 1
 grad_clip: 1.0
-fp16: false
 logging_steps: 50
-save_total_limit: 2
-save_strategy: steps
-save_steps: 500
 eval_strategy: steps
 eval_steps: 500
+save_strategy: steps
+save_steps: 100000
 val_ratio: 0.1
 precision: bf16
 
 # MLM params
 mlm_probability: 0.15
-random_token_probability: 0.10
-keep_token_probability: 0.10
-
-# NSP params
-nsp_probability: 0.5
 
 # Loss weights
 loss_weights:
@@ -43,7 +34,6 @@ loss_weights:
 
 # Progress
 report_to: wandb
-disable_tqdm: false
 
 # Data
 jsonl_path: "${data}"

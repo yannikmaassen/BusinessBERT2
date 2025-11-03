@@ -123,14 +123,15 @@ def main():
         weight_decay=config["weight_decay"],
         logging_steps=config["logging_steps"],
         save_strategy=config["save_strategy"],
+        save_steps=config["save_steps"],
         eval_strategy=config["eval_strategy"],
         eval_steps=config["eval_steps"],
         fp16=config.get("precision") == "fp16",
         bf16=config.get("precision") == "bf16",
         dataloader_num_workers=config["num_workers"],
         report_to="wandb" if config.get("report_to") == "wandb" else "none",
-        gradient_accumulation_steps=1,
-        max_grad_norm=config.get("grad_clip", 1.0),
+        gradient_accumulation_steps=config["gradient_accumulation_steps"],
+        max_grad_norm=config["grad_clip"],
         save_safetensors=False,
     )
 
