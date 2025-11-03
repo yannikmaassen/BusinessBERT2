@@ -45,12 +45,6 @@ loss_weights:
 report_to: wandb
 disable_tqdm: false
 
-# Debugging
-overfit_single_batch: false
-overfit_steps_per_epoch: 100
-overfit_eval_on_train_batch: false
-coarse_to_fine_weights: false
-
 # Data
 jsonl_path: "${data}"
 field_text: sentences
