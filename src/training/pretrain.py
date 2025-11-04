@@ -20,13 +20,49 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def load_config(path: str, data_override: str = None, report_to: str = None) -> Dict:
+def load_config(
+    path: str,
+    data_override: str = None,
+    report_to: str = None,
+    batch_size: int = None,
+    max_seq_length: int = None,
+    max_steps: int = None,
+    learning_rate: float = None,
+    num_train_epochs: int = None,
+    warmup_steps: int = None,
+    weight_decay: float = None,
+    precision: str = None,
+    gradient_accumulation_steps: int = None,
+) -> Dict:
+    """Load config from YAML and override with CLI arguments if provided."""
     with open(path, "r") as file:
         config = yaml.safe_load(file)
+
+    # Override config values with CLI arguments if provided
     if data_override:
         config["jsonl_path"] = data_override
     if report_to:
         config["report_to"] = report_to
+    if batch_size is not None:
+        config["train_batch_size"] = batch_size
+        config["val_batch_size"] = batch_size
+    if max_seq_length is not None:
+        config["max_seq_len"] = max_seq_length
+    if max_steps is not None:
+        config["max_steps"] = max_steps
+    if learning_rate is not None:
+        config["learning_rate"] = learning_rate
+    if num_train_epochs is not None:
+        config["num_train_epochs"] = num_train_epochs
+    if warmup_steps is not None:
+        config["num_warmup_steps"] = warmup_steps
+    if weight_decay is not None:
+        config["weight_decay"] = weight_decay
+    if precision is not None:
+        config["precision"] = precision
+    if gradient_accumulation_steps is not None:
+        config["gradient_accumulation_steps"] = gradient_accumulation_steps
+
     return config
 
 
@@ -41,7 +77,20 @@ def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
 
-    config = load_config(args.config, args.data, args.report_to)
+    config = load_config(
+        path=args.config,
+        data_override=args.data,
+        report_to=args.report_to,
+        batch_size=args.batch_size,
+        max_seq_length=args.max_seq_length,
+        max_steps=args.max_steps,
+        learning_rate=args.learning_rate,
+        num_train_epochs=args.num_train_epochs,
+        warmup_steps=args.warmup_steps,
+        weight_decay=args.weight_decay,
+        precision=args.precision,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+    )
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(int(config.get("seed", 42)))
@@ -82,9 +131,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    max_seq_len = args.get("max_seq_len", config["max_seq_len"])
-    train_dataset = PretrainDataset(train_rows, tokenizer, max_seq_len, taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
-    val_dataset   = PretrainDataset(val_rows,   tokenizer, max_seq_len, taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
 
     data_collator = Collator(tokenizer=tokenizer)
 
@@ -116,22 +164,22 @@ def main():
     training_args = TrainingArguments(
         output_dir=config["save_dir"],
         num_train_epochs=config["num_train_epochs"],
-        max_steps=args.get("max_steps", config["max_steps"]),
-        per_device_train_batch_size=args.get("batch_size", config["train_batch_size"]),
-        per_device_eval_batch_size=args.get("batch_size", config["val_batch_size"]),
-        warmup_steps=args.get("warmup_steps", config["num_warmup_steps"]),
-        learning_rate=args.get("learning_rate", config["learning_rate"]),
-        weight_decay=args.get("weight_decay", config["weight_decay"]),
+        max_steps=config["max_steps"],
+        per_device_train_batch_size=config["train_batch_size"],
+        per_device_eval_batch_size=config["val_batch_size"],
+        warmup_steps=config["num_warmup_steps"],
+        learning_rate=config["learning_rate"],
+        weight_decay=config["weight_decay"],
         logging_steps=config["logging_steps"],
         save_strategy=config["save_strategy"],
         save_steps=config["save_steps"],
         eval_strategy=config["eval_strategy"],
         eval_steps=config["eval_steps"],
-        fp16=args.get("precision" == "fp16", config.get("precision" == "fp16")),
-        bf16=args.get("precision" == "bf16", config.get("precision" == "bf16")),
+        fp16=(config.get("precision") == "fp16"),
+        bf16=(config.get("precision") == "bf16"),
         dataloader_num_workers=config["num_workers"],
-        report_to=args.get("report_to", config.get("report_to", "none")),
-        gradient_accumulation_steps=args.get("gradient_accumulation_steps", config["gradient_accumulation_steps"]),
+        report_to=config.get("report_to", "none"),
+        gradient_accumulation_steps=config["gradient_accumulation_steps"],
         max_grad_norm=config["grad_clip"],
         save_safetensors=False,
     )
