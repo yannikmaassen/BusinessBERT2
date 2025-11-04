@@ -82,8 +82,9 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
-    val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    max_seq_len = args.get("max_seq_len", config["max_seq_len"])
+    train_dataset = PretrainDataset(train_rows, tokenizer, max_seq_len, taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    val_dataset   = PretrainDataset(val_rows,   tokenizer, max_seq_len, taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
 
     data_collator = Collator(tokenizer=tokenizer)
 
@@ -115,22 +116,22 @@ def main():
     training_args = TrainingArguments(
         output_dir=config["save_dir"],
         num_train_epochs=config["num_train_epochs"],
-        max_steps=total_steps,
-        per_device_train_batch_size=config["train_batch_size"],
-        per_device_eval_batch_size=config["val_batch_size"],
-        warmup_steps=config["num_warmup_steps"],
-        learning_rate=config["learning_rate"],
-        weight_decay=config["weight_decay"],
+        max_steps=args.get("max_steps", config["max_steps"]),
+        per_device_train_batch_size=args.get("batch_size", config["train_batch_size"]),
+        per_device_eval_batch_size=args.get("batch_size", config["val_batch_size"]),
+        warmup_steps=args.get("warmup_steps", config["num_warmup_steps"]),
+        learning_rate=args.get("learning_rate", config["learning_rate"]),
+        weight_decay=args.get("weight_decay", config["weight_decay"]),
         logging_steps=config["logging_steps"],
         save_strategy=config["save_strategy"],
         save_steps=config["save_steps"],
         eval_strategy=config["eval_strategy"],
         eval_steps=config["eval_steps"],
-        fp16=config.get("precision") == "fp16",
-        bf16=config.get("precision") == "bf16",
+        fp16=args.get("precision" == "fp16", config.get("precision" == "fp16")),
+        bf16=args.get("precision" == "bf16", config.get("precision" == "bf16")),
         dataloader_num_workers=config["num_workers"],
-        report_to="wandb" if config.get("report_to") == "wandb" else "none",
-        gradient_accumulation_steps=config["gradient_accumulation_steps"],
+        report_to=args.get("report_to", config.get("report_to", "none")),
+        gradient_accumulation_steps=args.get("gradient_accumulation_steps", config["gradient_accumulation_steps"]),
         max_grad_norm=config["grad_clip"],
         save_safetensors=False,
     )
