@@ -135,7 +135,6 @@ class PretrainDatasetOnTheFly(Dataset):
         indexed_sic2_list: Dict[str, int],
         indexed_sic3_list: Dict[str, int],
         indexed_sic4_list: Dict[str, int],
-        preprocess_device: str = "cpu",
     ):
         self.raw_examples = raw_examples
         self.tokenizer = tokenizer
@@ -143,10 +142,6 @@ class PretrainDatasetOnTheFly(Dataset):
         self.indexed_sic2_list = indexed_sic2_list
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
-
-        # Force tokenizer to CPU
-        if hasattr(self.tokenizer, 'to'):
-            self.tokenizer = self.tokenizer.to(preprocess_device)
 
         self.valid_examples = []
         for example in tqdm(raw_examples, desc="Filtering valid examples"):
