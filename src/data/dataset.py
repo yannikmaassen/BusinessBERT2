@@ -47,7 +47,7 @@ class PretrainDataset(Dataset):
         print(f"{'='*30}\n")
 
         print("Preprocessing examples...")
-        self.examples = self._preprocess_examples(raw_examples[0:1000])
+        self.examples = self._preprocess_examples(raw_examples)
         print(f"Created {len(self.examples)} training examples")
 
         # DEBUG: Print processed examples info
