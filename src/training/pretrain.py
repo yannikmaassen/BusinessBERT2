@@ -134,8 +134,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDatasetRandomSampling(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
-    val_dataset   = PretrainDatasetRandomSampling(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    train_dataset = PretrainDatasetOnTheFly(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    val_dataset   = PretrainDatasetOnTheFly(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
 
     data_collator = Collator(tokenizer=tokenizer)
 
