@@ -15,6 +15,7 @@ def parse_cli_args():
     parser.add_argument("--weight_decay", required=False, help="Optional: override weight_decay")
     parser.add_argument("--precision", choices=["fp16", "bf16", "fp32"], help="Precision for training")
     parser.add_argument("--gradient_accumulation_steps", type=int, help="Gradient accumulation steps")
+    parser.add_argument("--num_workers", type=int, default=4, help="Number of data loading workers")
     args = parser.parse_args()
 
     if args.config is None:
@@ -59,5 +60,8 @@ def parse_cli_args():
 
     if args.gradient_accumulation_steps is not None:
         args.gradient_accumulation_steps = int(args.gradient_accumulation_steps)
+
+    if args.num_workers is not None:
+        args.num_workers = int(args.num_workers)
 
     return args

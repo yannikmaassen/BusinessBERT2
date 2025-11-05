@@ -33,6 +33,7 @@ def load_config(
     weight_decay: float = None,
     precision: str = None,
     gradient_accumulation_steps: int = None,
+    num_workers: int = None,
 ) -> Dict:
     """Load config from YAML and override with CLI arguments if provided."""
     with open(path, "r") as file:
@@ -62,6 +63,8 @@ def load_config(
         config["precision"] = precision
     if gradient_accumulation_steps is not None:
         config["gradient_accumulation_steps"] = gradient_accumulation_steps
+    if num_workers is not None:
+        config["num_workers"] = num_workers
 
     return config
 
