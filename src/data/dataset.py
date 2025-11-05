@@ -40,13 +40,17 @@ class PretrainDataset(Dataset):
     def __getitem__(self, idx) -> Dict[str, Any]:
         example = self.examples[idx]
 
+        sic2 = self._map_raw_sic_code_to_index(example["sic2"], self.indexed_sic2_list),
+        sic3 = self._map_raw_sic_code_to_index(example["sic3"], self.indexed_sic3_list),
+        sic4 = self._map_raw_sic_code_to_index(example["sic4"], self.indexed_sic4_list),
+
         # sic2, sic3 and sic4 are now returned as indices rather than actual SIC codes
         return {
             "input_ids": example["input_ids"],
             "attention_mask": example["attention_mask"],
-            "sic2": self._map_raw_sic_code_to_index(example["sic2"], self.indexed_sic2_list),
-            "sic3": self._map_raw_sic_code_to_index(example["sic3"], self.indexed_sic3_list),
-            "sic4": self._map_raw_sic_code_to_index(example["sic4"], self.indexed_sic4_list),
+            "sic2": sic2,
+            "sic3": sic3,
+            "sic4": sic4,
         }
 
 
