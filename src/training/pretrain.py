@@ -8,7 +8,7 @@ import yaml
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
-from src.data import PretrainDataset, Collator
+from src.data import PretrainDatasetRandomSampling, PretrainDatasetOnTheFly, Collator
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
@@ -134,8 +134,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDataset(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
-    val_dataset   = PretrainDataset(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    train_dataset = PretrainDatasetRandomSampling(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
+    val_dataset   = PretrainDatasetRandomSampling(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], preprocess_device="cpu")
 
     data_collator = Collator(tokenizer=tokenizer)
 
