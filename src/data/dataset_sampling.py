@@ -184,10 +184,12 @@ class PretrainDatasetOnTheFly(Dataset):
             "sic4": sic4,
         }
 
+
     def _map_raw_sic_code_to_index(self, sic_code: Optional[str], indexed_sic_list: Dict[str, int]) -> int:
         if sic_code is None or sic_code == "NA" or sic_code == "":
             return -100
         return indexed_sic_list.get(str(sic_code), -100)
+
 
     def __len__(self) -> int:
         return len(self.valid_examples)

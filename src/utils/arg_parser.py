@@ -36,7 +36,7 @@ def parse_cli_args():
     if args.max_seq_length is not None:
         args.max_seq_length = int(args.max_seq_length)
 
-    if args.max_steps is not None:
+    if args.max_steps is not None and args.max_steps != "none":
         args.max_steps = int(args.max_steps)
 
     if args.learning_rate is not None:
