@@ -57,7 +57,8 @@ train-data-colab:
 		--warmup_steps $(WARMUP_STEPS) \
 		--weight_decay $(WEIGHT_DECAY) \
 		--precision $(PRECISION) \
-		--gradient_accumulation_steps $(GRADIENT_ACCUMULATION_STEPS)
+		--gradient_accumulation_steps $(GRADIENT_ACCUMULATION_STEPS) \
+		--num_workers $(NUM_WORKERS)
 
 
 # ====== Cleanup ======
