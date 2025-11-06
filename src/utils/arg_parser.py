@@ -1,6 +1,20 @@
 import argparse
 import os
 
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v is None:
+        return None
+    val = str(v).strip().lower()
+    if val in ("true", "True", "1"):
+        return True
+    if val in ("false", "False", "0"):
+        return False
+    raise argparse.ArgumentTypeError("Boolean value expected (true/false).")
+
+
 def parse_cli_args():
     parser = argparse.ArgumentParser(description="BusinessBERT 2.0 – Pretraining")
     parser.add_argument("--config", required=False, help="Path to YAML config")
@@ -99,7 +113,7 @@ def parse_cli_args():
     print(args.load_best_model_at_end)
 
     if args.load_best_model_at_end is not None:
-        args.load_best_model_at_end = bool(args.load_best_model_at_end)
+        args.load_best_model_at_end = str2bool(args.load_best_model_at_end)
         print(args.load_best_model_at_end)
 
     if args.metric_for_best_model is not None:
