@@ -1,106 +1,22 @@
 import os
 import random
-from typing import Dict
 import wandb
 from sklearn.model_selection import train_test_split
 import torch
-import yaml
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
-from src.data import PretrainDataset, PretrainDatasetRandomSampling, PretrainDatasetOnTheFly, Collator
+from src.data import PretrainDatasetOnTheFly, Collator
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
+from src.utils.config_loader import load_config
 
 
 def set_seed(seed: int):
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
-
-def load_config(
-    path: str,
-    data_override: str = None,
-    report_to: str = None,
-    max_seq_length: int = None,
-    batch_size: int = None,
-    learning_rate: float = None,
-    num_train_epochs: int = None,
-    max_steps: int = None,
-    warmup_steps: int = None,
-    num_workers: int = None,
-    weight_decay: float = None,
-    gradient_accumulation_steps: int = None,
-    grad_clip: float = None,
-    precision: str = None,
-    logging_steps: int = None,
-    eval_strategy: str = None,
-    eval_steps: int = None,
-    save_total_limit: int = None,
-    save_strategy: str = None,
-    save_steps: int = None,
-    load_best_model_at_end: bool = None,
-    metric_for_best_model: str = None,
-    greater_is_better: bool = None,
-    val_ratio: float = None,
-
-) -> Dict:
-    """Load config from YAML and override with CLI arguments if provided."""
-    with open(path, "r") as file:
-        config = yaml.safe_load(file)
-
-    # Override config values with CLI arguments if provided
-    if data_override:
-        config["jsonl_path"] = data_override
-    if report_to:
-        config["report_to"] = report_to
-    if max_seq_length is not None:
-        config["max_seq_len"] = max_seq_length
-    if batch_size is not None:
-        config["train_batch_size"] = batch_size
-        config["val_batch_size"] = batch_size
-    if learning_rate is not None:
-        config["learning_rate"] = learning_rate
-    if num_train_epochs is not None:
-        config["num_train_epochs"] = num_train_epochs
-    if max_steps is not None:
-        config["max_steps"] = max_steps
-    if warmup_steps is not None:
-        config["num_warmup_steps"] = warmup_steps
-    if num_workers is not None:
-        config["num_workers"] = num_workers
-    if weight_decay is not None:
-        config["weight_decay"] = weight_decay
-    if gradient_accumulation_steps is not None:
-        config["gradient_accumulation_steps"] = gradient_accumulation_steps
-    if grad_clip is not None:
-        config["grad_clip"] = grad_clip
-    if precision is not None:
-        config["precision"] = precision
-    if logging_steps is not None:
-        config["logging_steps"] = logging_steps
-    if eval_strategy is not None:
-        config["eval_strategy"] = eval_strategy
-    if eval_steps is not None:
-        config["eval_steps"] = eval_steps
-    if save_total_limit is not None:
-        config["save_total_limit"] = save_total_limit
-    if save_strategy is not None:
-        config["save_strategy"] = save_strategy
-    if save_steps is not None:
-        config["save_steps"] = save_steps
-    if load_best_model_at_end is not None:
-        config["load_best_model_at_end"] = load_best_model_at_end
-    if metric_for_best_model is not None:
-        config["metric_for_best_model"] = metric_for_best_model
-    if greater_is_better is not None:
-        config["greater_is_better"] = greater_is_better
-    if val_ratio is not None:
-        config["val_ratio"] = val_ratio
-
-    return config
 
 
 def setup_tokenizer(base_tokenizer: str):
@@ -114,32 +30,7 @@ def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
 
-    config = load_config(
-        path=args.config,
-        data_override=args.data,
-        report_to=args.report_to,
-        max_seq_length=args.max_seq_length,
-        batch_size=args.batch_size,
-        learning_rate=args.learning_rate,
-        num_train_epochs=args.num_train_epochs,
-        max_steps=args.max_steps,
-        warmup_steps=args.warmup_steps,
-        num_workers=args.num_workers,
-        weight_decay=args.weight_decay,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        grad_clip=args.grad_clip,
-        precision=args.precision,
-        logging_steps=args.logging_steps,
-        eval_strategy=args.eval_strategy,
-        eval_steps=args.eval_steps,
-        save_total_limit=args.save_total_limit,
-        save_strategy=args.save_strategy,
-        save_steps=args.save_steps,
-        load_best_model_at_end=args.load_best_model_at_end,
-        metric_for_best_model=args.metric_for_best_model,
-        greater_is_better=args.greater_is_better,
-        val_ratio=args.val_ratio,
-    )
+    config = load_config(args)
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(int(config.get("seed", 42)))
