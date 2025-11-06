@@ -20,9 +20,7 @@ train-colab:
 
 train-data-colab:
 	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/businessbert_data/sample.jsonl"; exit 1; fi
-	$(PY) -m src.training.pretrain \
-		--config $(CONFIG) \
-		--data $(DATA) \
+	$(PY) -m src.training.pretrain --config $(CONFIG) --data $(DATA) \
 		--report_to $(REPORT_TO) \
 		--max_seq_length $(MAX_SEQ_LENGTH) \
 		--batch_size $(BATCH_SIZE) \
