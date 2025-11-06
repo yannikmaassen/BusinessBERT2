@@ -1,5 +1,4 @@
 # ====== Settings ======
-VENV?=.venv
 PY?=python
 PIP?=pip
 CONFIG?=config/pretrain.yaml
@@ -8,33 +7,9 @@ CONFIG?=config/pretrain.yaml
 
 help:
 	@echo "Common commands:"
-	@echo "  make venv                 # create local virtualenv"
-	@echo "  make install              # install deps into venv"
 	@echo "  make install-colab        # install deps in current environment (Colab)"
-	@echo "  make train                # run smoke pretrain with $(CONFIG) (uses venv)"
-	@echo "  make train-data DATA=...  # same but override dataset path"
 	@echo "  make train-colab          # run pretrain in current env (Colab)"
 	@echo "  make train-data-colab DATA=...   # pretrain w/ explicit data path (Colab)"
-	@echo "  make test                 # quick import test"
-	@echo "  make clean                # remove caches / outputs"
-
-# ====== Local dev (venv) ======
-venv:
-	$(PY) -m venv $(VENV)
-	. $(VENV)/bin/activate; $(PIP) install --upgrade pip
-
-install:
-	. $(VENV)/bin/activate; $(PIP) install --no-cache-dir -r requirements.txt
-
-train:
-	. $(VENV)/bin/activate; $(PY) -m src.training.pretrain --config $(CONFIG)
-
-train-data:
-	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data DATA=/path/to/file.jsonl"; exit 1; fi
-	. $(VENV)/bin/activate; $(PY) -m src.training.pretrain --config $(CONFIG) --data $(DATA)
-
-test:
-	. $(VENV)/bin/activate; $(PY) -c "import transformers, torch; print('OK', transformers.__version__)"
 
 # ====== Colab / any pre-provisioned env (no venv) ======
 install-colab:
@@ -70,17 +45,3 @@ train-data-colab:
 		--metric_for_best_model $(METRIC_FOR_BEST_MODEL) \
 		--greater_is_better $(GREATER_IS_BETTER) \
 		--val_ratio $(VAL_RATIO)
-
-# ====== Cleanup ======
-clean:
-	rm -rf __pycache__ .pytest_cache */__pycache__ *.egg-info
-	rm -rf outputs checkpoints
-
-pretrain:
-	python -m src.training.pretrain --config config/pretrain.yaml --data ./data/sample.jsonl
-
-analyze_vocab:
-	python -m src.analyze_vocab --config config/pretrain.yaml --data ./data/sample.jsonl
-
-analyze-vocab-colab:
-	$(PY) -m src.analyze_vocab --data $(DATA)
