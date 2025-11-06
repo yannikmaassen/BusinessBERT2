@@ -37,7 +37,7 @@ def parse_cli_args():
     parser.add_argument("--save_total_limit", type=int, default=3, help="Total number of checkpoints to keep")
     parser.add_argument("--save_strategy", type=str, default="steps", help="Save strategy: 'steps' or 'epoch'")
     parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X steps")
-    parser.add_argument("--load_best_model_at_end", type=bool, default=True, help="Whether to load the best model at end")
+    parser.add_argument("--load_best_model_at_end", type=str2bool, default=True, help="Whether to load the best model at end")
     parser.add_argument("--metric_for_best_model", type=str, default="eval_loss", help="Which metric to use for best model")
     parser.add_argument("--greater_is_better", type=bool, default=False, help="Whether a greater metric is better")
     parser.add_argument("--val_ratio", type=float, default=0.1, help="Validation data ratio")
@@ -113,7 +113,7 @@ def parse_cli_args():
     print(args.load_best_model_at_end)
 
     if args.load_best_model_at_end is not None:
-        args.load_best_model_at_end = str2bool(args.load_best_model_at_end)
+        args.load_best_model_at_end = args.load_best_model_at_end
         print(args.load_best_model_at_end)
 
     if args.metric_for_best_model is not None:
