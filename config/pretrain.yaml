@@ -28,7 +28,8 @@ load_best_model_at_end: False
 metric_for_best_model: "eval_loss"
 greater_is_better: False
 val_ratio: 0.1
-
+wandb_mode: "online"
+wandb_project: "pretrain-businessbert2"
 
 # Loss weights
 loss_weights:
@@ -48,3 +49,4 @@ field_sic4: sic4
 # Saving
 save_dir: ./outputs/pretrain
 safe_serialization: false
+save_safetensors: false

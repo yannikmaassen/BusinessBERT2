@@ -61,5 +61,15 @@ def load_config(args) -> Dict:
         config["greater_is_better"] = args.greater_is_better
     if getattr(args, "val_ratio", None) is not None:
         config["val_ratio"] = args.val_ratio
+    if getattr(args, "save_dir", None):
+        config["save_dir"] = args.save_dir
+    if getattr(args, "save_safetensors", None) is not None:
+        config["save_safetensors"] = args.save_safetensors
+    if getattr(args, "safe_serialization", None) is not None:
+        config["safe_serialization"] = args.safe_serialization
+    if getattr(args, "wandb_mode", None) is not None:
+        config["wandb_mode"] = args.wandb_mode
+    if getattr(args, "wandb_project", None) is not None:
+        config["wandb_project"] = args.wandb_project
 
     return config

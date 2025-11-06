@@ -44,4 +44,6 @@ train-data-colab:
 		--load_best_model_at_end $(LOAD_BEST_MODEL_AT_END) \
 		--metric_for_best_model $(METRIC_FOR_BEST_MODEL) \
 		--greater_is_better $(GREATER_IS_BETTER) \
-		--val_ratio $(VAL_RATIO)
+		--val_ratio $(VAL_RATIO) \
+		--wandb_mode $(WANDB_MODE) \
+		--wandb_project $(WANDB_PROJECT)

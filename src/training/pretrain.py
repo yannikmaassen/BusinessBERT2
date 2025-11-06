@@ -31,6 +31,11 @@ def main():
     args = parse_cli_args()
 
     config = load_config(args)
+
+    print("Configuration:")
+    for key, value in config.items():
+        print(f"{key}: {value}")
+
     os.makedirs(config["save_dir"], exist_ok=True)
 
     set_seed(int(config.get("seed", 42)))
@@ -40,8 +45,8 @@ def main():
     wb = None
     if use_wandb and wandb is not None:
         wb_init_kwargs = dict(
-            project=config.get("wandb_project", "businessbert2"),
-            mode=config.get("wandb_mode", "online"),   # "online" | "offline" | "disabled"
+            project=config["wandb_project"],
+            mode=config["wandb_mode"],
             resume="allow",
         )
         wb_init_kwargs = {k: v for k, v in wb_init_kwargs.items() if v is not None}
@@ -121,7 +126,7 @@ def main():
         load_best_model_at_end=config.get("load_best_model_at_end"),
         metric_for_best_model=config.get("metric_for_best_model"),
         greater_is_better=config.get("greater_is_better"),
-        save_safetensors=False,
+        save_safetensors=config["save_safetensors"]
     )
 
     trainer = MultiTaskTrainer(
@@ -136,7 +141,7 @@ def main():
 
     trainer.train(resume_from_checkpoint=True)
 
-    model.save_pretrained(config["save_dir"], safe_serialization=bool(config.get("safe_serialization", False)))
+    model.save_pretrained(config["save_dir"], safe_serialization=config["safe_serialization"])
     tokenizer.save_pretrained(config["save_dir"])
     print(f"Saved to {config['save_dir']}")
 

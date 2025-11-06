@@ -27,6 +27,11 @@ def parse_cli_args():
     parser.add_argument("--metric_for_best_model", type=str, default="eval_loss", help="Which metric to use for best model")
     parser.add_argument("--greater_is_better", type=bool, default=False, help="Whether a greater metric is better")
     parser.add_argument("--val_ratio", type=float, default=0.1, help="Validation data ratio")
+    parser.add_argument("--save_dir", type=str, default="./output", help="Directory to save the model and tokenizer")
+    parser.add_argument("--save_safetensors", type=bool, default=False, help="Whether to save model in safetensors format")
+    parser.add_argument("--safe_serialization", type=bool, default=False, help="Whether to use safe serialization when saving the model")
+    parser.add_argument("--wandb_mode", type=str, default="online", help="WandB mode: 'online', 'offline', or 'disabled'")
+    parser.add_argument("--wandb_project", type=str, default="pretraining-businessbert2", help="WandB project name")
     args = parser.parse_args()
 
     if args.config is None:
@@ -101,5 +106,20 @@ def parse_cli_args():
 
     if args.val_ratio is not None:
         args.val_ratio = float(args.val_ratio)
+
+    if args.save_dir is not None:
+        args.save_dir = str(args.save_dir)
+
+    if args.save_safetensors is not None:
+        args.save_safetensors = bool(args.save_safetensors)
+
+    if args.safe_serialization is not None:
+        args.safe_serialization = bool(args.safe_serialization)
+
+    if args.wandb_mode not in ["online", "offline", "disabled"]:
+        args.wandb_mode = "online"
+
+    if args.wandb_project is not None:
+        args.wandb_project = str(args.wandb_project)
 
     return args
