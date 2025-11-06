@@ -16,6 +16,10 @@ def parse_cli_args():
     parser.add_argument("--precision", choices=["fp16", "bf16", "fp32"], help="Precision for training")
     parser.add_argument("--gradient_accumulation_steps", type=int, help="Gradient accumulation steps")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of data loading workers")
+    parser.add_argument("--save_total_limit", type=int, default=3, help="Total number of checkpoints to keep")
+    parser.add_argument("--load_best_model_at_end", type=bool, default=True, help="Whether to load the best model at end")
+    parser.add_argument("--metric_for_best_model", type=str, default="eval_loss", help="Which metric to use for best model")
+    parser.add_argument("--greater_is_better", type=bool, default=False, help="Whether a greater metric is better")
     args = parser.parse_args()
 
     if args.config is None:
@@ -63,5 +67,17 @@ def parse_cli_args():
 
     if args.num_workers is not None:
         args.num_workers = int(args.num_workers)
+
+    if args.save_total_limit is not None:
+        args.save_total_limit = int(args.save_total_limit)
+
+    if args.load_best_model_at_end is not None:
+        args.load_best_model_at_end = bool(args.load_best_model_at_end)
+
+    if args.metric_for_best_model is not None:
+        args.metric_for_best_model = str(args.metric_for_best_model)
+
+    if args.greater_is_better is not None:
+        args.greater_is_better = bool(args.greater_is_better)
 
     return args

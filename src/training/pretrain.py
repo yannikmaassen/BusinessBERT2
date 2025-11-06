@@ -34,6 +34,10 @@ def load_config(
     precision: str = None,
     gradient_accumulation_steps: int = None,
     num_workers: int = None,
+    save_total_limit: int = None,
+    load_best_model_at_end: bool = None,
+    metric_for_best_model: str = None,
+    greater_is_better: bool = None,
 ) -> Dict:
     """Load config from YAML and override with CLI arguments if provided."""
     with open(path, "r") as file:
@@ -65,6 +69,14 @@ def load_config(
         config["gradient_accumulation_steps"] = gradient_accumulation_steps
     if num_workers is not None:
         config["num_workers"] = num_workers
+    if save_total_limit is not None:
+        config["save_total_limit"] = save_total_limit
+    if load_best_model_at_end is not None:
+        config["load_best_model_at_end"] = load_best_model_at_end
+    if metric_for_best_model is not None:
+        config["metric_for_best_model"] = metric_for_best_model
+    if greater_is_better is not None:
+        config["greater_is_better"] = greater_is_better
 
     return config
 
@@ -93,6 +105,10 @@ def main():
         weight_decay=args.weight_decay,
         precision=args.precision,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        save_total_limit=args.save_total_limit,
+        load_best_model_at_end=args.load_best_model_at_end,
+        metric_for_best_model=args.metric_for_best_model,
+        greater_is_better=args.greater_is_better,
     )
     os.makedirs(config["save_dir"], exist_ok=True)
 
@@ -158,12 +174,8 @@ def main():
     if use_wandb and wandb is not None and config.get("wandb_watch", True):
         wandb.watch(model, log="gradients", log_freq=max(1, int(config.get("logging_steps", 50))))
 
-    # Calculate total steps
-    # steps_per_epoch = len(train_dataset) // config["train_batch_size"]
-    # total_steps = config["num_train_epochs"] * steps_per_epoch
     total_steps = config["max_steps"]
 
-    # Training arguments
     training_args = TrainingArguments(
         output_dir=config["save_dir"],
         num_train_epochs=config["num_train_epochs"],
@@ -184,10 +196,13 @@ def main():
         report_to=config.get("report_to", "none"),
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
         max_grad_norm=config["grad_clip"],
+        save_total_limit=config["save_total_limit"],
+        load_best_model_at_end=config.get("load_best_model_at_end"),
+        metric_for_best_model=config.get("metric_for_best_model"),
+        greater_is_better=config.get("greater_is_better"),
         save_safetensors=False,
     )
 
-    # Initialize trainer
     trainer = MultiTaskTrainer(
         model=model,
         args=training_args,
@@ -198,8 +213,7 @@ def main():
         total_steps=total_steps,
     )
 
-    # Train
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
 
     model.save_pretrained(config["save_dir"], safe_serialization=bool(config.get("safe_serialization", False)))
     tokenizer.save_pretrained(config["save_dir"])
