@@ -44,4 +44,5 @@ train-data-colab:
 		--greater_is_better $(GREATER_IS_BETTER) \
 		--val_ratio $(VAL_RATIO) \
 		--wandb_mode $(WANDB_MODE) \
-		--wandb_project $(WANDB_PROJECT)
+		--wandb_project $(WANDB_PROJECT) \
+		--save_dir $(SAVE_DIR)

@@ -27,7 +27,7 @@ def parse_cli_args():
     parser.add_argument("--metric_for_best_model", type=str, default="eval_loss", help="Which metric to use for best model")
     parser.add_argument("--greater_is_better", type=bool, default=False, help="Whether a greater metric is better")
     parser.add_argument("--val_ratio", type=float, default=0.1, help="Validation data ratio")
-    parser.add_argument("--save_dir", type=str, default="./output", help="Directory to save the model and tokenizer")
+    parser.add_argument("--save_dir", type=str, default="./outputs/pretrain", help="Directory to save the model and tokenizer")
     parser.add_argument("--save_safetensors", type=bool, default=False, help="Whether to save model in safetensors format")
     parser.add_argument("--safe_serialization", type=bool, default=False, help="Whether to use safe serialization when saving the model")
     parser.add_argument("--wandb_mode", type=str, default="online", help="WandB mode: 'online', 'offline', or 'disabled'")
@@ -95,8 +95,12 @@ def parse_cli_args():
     if args.save_steps is not None:
         args.save_steps = int(args.save_steps)
 
+    print("############### DEBUG ARGS ###############")
+    print(args.load_best_model_at_end)
+
     if args.load_best_model_at_end is not None:
         args.load_best_model_at_end = bool(args.load_best_model_at_end)
+        print(args.load_best_model_at_end)
 
     if args.metric_for_best_model is not None:
         args.metric_for_best_model = str(args.metric_for_best_model)
