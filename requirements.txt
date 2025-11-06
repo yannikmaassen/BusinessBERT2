@@ -8,3 +8,6 @@ tqdm>=4.66.0
 
 torch>=2.8.0
 scikit-learn~=1.7.1
+
+wandb
+hf_transfer
