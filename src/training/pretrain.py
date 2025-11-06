@@ -11,6 +11,7 @@ from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
 from src.utils.config_loader import load_config
+from src.utils.checkpoint_finder import find_latest_checkpoint
 
 
 def set_seed(seed: int):
@@ -139,7 +140,8 @@ def main():
         total_steps=total_steps,
     )
 
-    trainer.train(resume_from_checkpoint=True)
+    last_checkpoint = find_latest_checkpoint(config["save_dir"])
+    trainer.train(resume_from_checkpoint=last_checkpoint if last_checkpoint is not None else False)
 
     model.save_pretrained(config["save_dir"], safe_serialization=config["safe_serialization"])
     tokenizer.save_pretrained(config["save_dir"])
