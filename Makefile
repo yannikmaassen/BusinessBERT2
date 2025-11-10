@@ -19,8 +19,10 @@ train-colab:
 	$(PY) -m src.training.pretrain --config $(CONFIG)
 
 train-data-colab:
-	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/content/drive/MyDrive/businessbert_data/sample.jsonl"; exit 1; fi
-	$(PY) -m src.training.pretrain --config $(CONFIG) --data $(DATA) \
+	@if [ -z "$(DATA)" ]; then echo "Usage: make train-data-colab DATA=/path/to/data"; exit 1; fi
+	$(PY) -m src.training.pretrain \
+		--config $(CONFIG) \
+		--data $(DATA) \
 		--report_to $(REPORT_TO) \
 		--max_seq_length $(MAX_SEQ_LENGTH) \
 		--batch_size $(BATCH_SIZE) \
@@ -47,5 +49,4 @@ train-data-colab:
 		--wandb_project $(WANDB_PROJECT) \
 		--save_dir $(SAVE_DIR) \
 		--save_safetensors $(SAVE_SAFETENSORS) \
-		--safe_serialization $(SAFE_SERIALIZATION) \
-		--loss_weights $(LOSS_WEIGHTS)
+		--safe_serialization $(SAFE_SERIALIZATION)

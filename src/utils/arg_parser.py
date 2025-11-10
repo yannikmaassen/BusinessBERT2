@@ -16,16 +16,6 @@ def str2bool(v):
     raise argparse.ArgumentTypeError("Boolean value expected (true/false).")
 
 
-def parse_loss_weights(raw):
-    if raw is None:
-        return None
-    # Accept either JSON style or Python dict literal
-    try:
-        return dict(ast.literal_eval(raw))
-    except Exception as e:
-        raise argparse.ArgumentTypeError(f"Could not parse loss_weights: {e}")
-
-
 def parse_cli_args():
     parser = argparse.ArgumentParser(description="BusinessBERT 2.0 – Pretraining")
     parser.add_argument("--config", required=False, help="Path to YAML config")
@@ -57,8 +47,6 @@ def parse_cli_args():
     parser.add_argument("--safe_serialization", required=False, type=str2bool, default=False, help="Whether to use safe serialization when saving the model")
     parser.add_argument("--wandb_mode", required=False, type=str, default="online", help="WandB mode: 'online', 'offline', or 'disabled'")
     parser.add_argument("--wandb_project", required=False, type=str, default="pretraining-businessbert2", help="WandB project name")
-    parser.add_argument("--loss_weights", required=False, type=parse_loss_weights,
-                        help="Override loss weights, e.g. --loss_weights \"{'mlm':1.0,'ic2':1.0,'ic3':0.8,'ic4':0.5,'consistency':0.2}\"")
     args = parser.parse_args()
 
     if args.config is None:

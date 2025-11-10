@@ -71,7 +71,5 @@ def load_config(args) -> Dict:
         config["wandb_mode"] = args.wandb_mode
     if getattr(args, "wandb_project", None) is not None:
         config["wandb_project"] = args.wandb_project
-    if getattr(args, "loss_weights", None) is not None:
-        config["loss_weights"] = args.loss_weights
 
     return config
