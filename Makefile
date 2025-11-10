@@ -45,4 +45,7 @@ train-data-colab:
 		--val_ratio $(VAL_RATIO) \
 		--wandb_mode $(WANDB_MODE) \
 		--wandb_project $(WANDB_PROJECT) \
-		--save_dir $(SAVE_DIR)
+		--save_dir $(SAVE_DIR) \
+		--save_safetensors $(SAVE_SAFETENSORS) \
+		--safe_serialization $(SAFE_SERIALIZATION) \
+		--loss_weights $(LOSS_WEIGHTS)
