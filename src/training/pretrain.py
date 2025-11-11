@@ -1,7 +1,5 @@
 import os
 import random
-
-import numpy
 import wandb
 from sklearn.model_selection import train_test_split
 import torch
@@ -30,7 +28,6 @@ def setup_tokenizer(base_tokenizer: str):
 
 
 def main():
-    torch.serialization.add_safe_globals([numpy.core.multiarray._reconstruct])
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
 
