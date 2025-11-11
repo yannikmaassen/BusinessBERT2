@@ -141,6 +141,7 @@ def main():
     )
 
     last_checkpoint = find_latest_checkpoint(config["save_dir"])
+    print(f"Found latest checkpoint at: {last_checkpoint}")
     trainer.train(resume_from_checkpoint=last_checkpoint if last_checkpoint is not None else False)
 
     model.save_pretrained(config["save_dir"], safe_serialization=config["safe_serialization"])
