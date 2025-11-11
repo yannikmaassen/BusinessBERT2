@@ -28,6 +28,13 @@ def setup_tokenizer(base_tokenizer: str):
 
 
 def main():
+    # force legacy torch.load behavior to load checkpoints
+    _orig_load = torch.load
+    def _load_force_weights_false(f, *args, **kwargs):
+         kwargs.setdefault("weights_only", False)
+         return _orig_load(f, *args, **kwargs)
+    torch.load = _load_force_weights_false
+
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     args = parse_cli_args()
 
