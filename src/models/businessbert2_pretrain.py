@@ -52,7 +52,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         A43: torch.Tensor,  # [|SIC4| x |SIC3|] child->parent indicator (4->3)
         loss_weights: Dict[str, float],
         consistency_warmup_ratio: float = 0.2,
-
+        total_steps: int = 1,
     ):
         super().__init__(config)
         self.bert = BertForPreTraining(config)
@@ -70,6 +70,8 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.register_buffer("M42", M42)  # [|SIC4| x |SIC2|] - child-to-grandparent mapping
 
         self.consistency_warmup_ratio = consistency_warmup_ratio
+        self.total_steps = total_steps
+        self.current_step = 0
         self.loss_weights = dict(loss_weights)
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
         self.init_weights()
@@ -82,14 +84,10 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             mlm_labels: Optional[torch.Tensor] = None,
             sic2: Optional[torch.Tensor] = None,
             sic3: Optional[torch.Tensor] = None,
-            sic4: Optional[torch.Tensor] = None,
-            current_step: Optional[int] = None,
-            total_steps: Optional[int] = None,
+            sic4: Optional[torch.Tensor] = None
     ):
-        if current_step is not None:
-            self.current_step = torch.tensor(current_step)
-        if total_steps is not None:
-            self.total_steps = torch.tensor(total_steps)
+        if self.training:
+            self.current_step += 1
 
         transformer_outputs = self.bert.bert(
             input_ids=input_ids,
