@@ -101,6 +101,7 @@ def main():
         A32=taxonomy_maps["A32"].to(device) if len(taxonomy_maps["sic3_list"]) and len(taxonomy_maps["sic2_list"]) else torch.empty(0),
         A43=taxonomy_maps["A43"].to(device) if len(taxonomy_maps["sic4_list"]) and len(taxonomy_maps["sic3_list"]) else torch.empty(0),
         loss_weights=config["loss_weights"],
+        consistency_warmup_ratio=0.2,
     )
 
     model.to(device)
