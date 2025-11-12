@@ -148,6 +148,20 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             if total > 0:
                 metrics["ic4_accuracy"] = torch.tensor(correct / total)
 
+        acc_weighted_sum = 0.0
+        acc_weight_sum = 0.0
+        for key, weight in (
+            ("ic2_accuracy", self.loss_weights.get("ic2", 1.0)),
+            ("ic3_accuracy", self.loss_weights.get("ic3", 0.8)),
+            ("ic4_accuracy", self.loss_weights.get("ic4", 0.5)),
+        ):
+            if key in metrics:
+                acc_weighted_sum += float(metrics[key].item()) * float(weight)
+                acc_weight_sum += float(weight)
+
+        if acc_weight_sum > 0.0:
+            metrics["ic_accuracy"] = torch.tensor(acc_weighted_sum / acc_weight_sum)
+
         # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
         have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (self.M43.numel() > 0)
         have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (self.M42.numel() > 0)
