@@ -53,9 +53,15 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         loss_weights: Dict[str, float],
         consistency_warmup_ratio: float = 0.2,
         total_steps: int = 1,
+        base_model_name: Optional[str] = None,
     ):
         super().__init__(config)
-        self.bert = BertForPreTraining(config)
+        if base_model_name:
+            print("### Initializing BusinessBERT2Pretrain from pretrained model:", base_model_name)
+            self.bert = BertForPreTraining.from_pretrained(base_model_name)
+        else:
+            self.bert = BertForPreTraining(config)
+
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
         self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
@@ -74,7 +80,10 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.current_step = 0
         self.loss_weights = dict(loss_weights)
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
-        self.init_weights()
+
+        # Only reinit if not loading pretrained weights
+        if not base_model_name:
+            self.init_weights()
 
 
     def forward(

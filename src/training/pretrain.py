@@ -103,6 +103,7 @@ def main():
         loss_weights=config["loss_weights"],
         consistency_warmup_ratio=0.2,
         total_steps=config["max_steps"],
+        base_model_name=config["base_model_name"],
     )
 
     model.to(device)

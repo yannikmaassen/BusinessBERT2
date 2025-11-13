@@ -160,6 +160,7 @@ class PretrainDatasetOnTheFly(Dataset):
             truncation=False,
             padding=False,
             return_tensors=None,
+            return_special_tokens_mask=True,
         )
 
         # Sample random window
