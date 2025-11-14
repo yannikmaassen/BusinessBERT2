@@ -187,17 +187,17 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             if valid_mask.any():  # Only proceed if we have at least one valid example
                 parts = []
 
-                prob_4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
+                prob_4 = F.softmax(sic4_logits[valid_mask], dim=-1)  # [B, n4]
 
                 if have_m43:
                     # implied SIC3 distribution by summing SIC4 children
                     implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
-                    parts.append(_kl_divergence(sic3_logits, implied_p3))
+                    parts.append(_kl_divergence(sic3_logits[valid_mask], implied_p3))
 
                 if have_m42:
                     # implied SIC2 distribution by summing SIC4 children
                     implied_p2 = torch.matmul(prob_4, self.M42)  # [B, n2]
-                    parts.append(_kl_divergence(sic2_logits, implied_p2))
+                    parts.append(_kl_divergence(sic2_logits[valid_mask], implied_p2))
 
                 if parts:
                     consistency_loss = torch.stack(parts).mean()
