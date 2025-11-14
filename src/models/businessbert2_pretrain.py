@@ -116,7 +116,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if mlm_labels is not None:
             mlm_loss = self.cross_entropy(mlm_logits.view(-1, mlm_logits.size(-1)), mlm_labels.view(-1))
             losses["mlm"] = mlm_loss
-            total_loss += self.loss_weights.get("mlm", 1.0) * mlm_loss
+            total_loss += self.loss_weights["mlm"] * mlm_loss
 
             # MLM accuracy (only on masked tokens, ignore -100)
             correct, total = mlm_accuracy(mlm_logits, mlm_labels)
@@ -127,7 +127,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if sic2_logits is not None and sic2 is not None:
             ic2_loss = self.cross_entropy(sic2_logits, sic2)
             losses["ic2"] = ic2_loss
-            total_loss += self.loss_weights.get("ic2", 1.0) * ic2_loss
+            total_loss += self.loss_weights["ic2"] * ic2_loss
 
             # SIC2 accuracy
             correct, total = top1_accuracy(sic2_logits, sic2)
@@ -137,7 +137,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if sic3_logits is not None and sic3 is not None:
             ic3_loss = self.cross_entropy(sic3_logits, sic3)
             losses["ic3"] = ic3_loss
-            total_loss += self.loss_weights.get("ic3", 0.8) * ic3_loss
+            total_loss += self.loss_weights["ic3"] * ic3_loss
 
             # SIC3 accuracy
             correct, total = top1_accuracy(sic3_logits, sic3)
@@ -147,7 +147,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if sic4_logits is not None and sic4 is not None:
             ic4_loss = self.cross_entropy(sic4_logits, sic4)
             losses["ic4"] = ic4_loss
-            total_loss += self.loss_weights.get("ic4", 0.5) * ic4_loss
+            total_loss += self.loss_weights["ic4"] * ic4_loss
 
             # SIC4 accuracy
             correct, total = top1_accuracy(sic4_logits, sic4)
@@ -199,7 +199,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 if parts:
                     consistency_loss = torch.stack(parts).mean()
                     losses["consistency"] = consistency_loss
-                    total_loss += consistency_weight * self.loss_weights.get("consistency", 0.2) * consistency_loss
+                    total_loss += consistency_weight * self.loss_weights["consistency"] * consistency_loss
 
         return {
             "loss": total_loss,
