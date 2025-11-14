@@ -174,7 +174,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         if have_m43 or have_m42:
             warmup_steps = int(self.total_steps * self.consistency_warmup_ratio)
-            if current_step < warmup_steps:
+            step = current_step if current_step is not None else 0
+
+            if step < warmup_steps:
                 consistency_weight = current_step / warmup_steps
             else:
                 consistency_weight = 1.0
