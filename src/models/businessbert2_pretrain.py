@@ -51,7 +51,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         A32: torch.Tensor,  # [|SIC3| x |SIC2|] child->parent indicator (3->2)
         A43: torch.Tensor,  # [|SIC4| x |SIC3|] child->parent indicator (4->3)
         loss_weights: Dict[str, float],
-        consistency_warmup_ratio: float = 0.2,
+        consistency_warmup_ratio: float = 0.3,
         total_steps: int = 1,
         base_model_name: Optional[str] = None,
     ):
@@ -182,24 +182,27 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             else:
                 consistency_weight = 1.0
 
-            parts = []
+            # Mask for valid SIC4 labels
+            valid_mask = (sic4 != -100)
+            if valid_mask.any():  # Only proceed if we have at least one valid example
+                parts = []
 
-            prob_4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
+                prob_4 = F.softmax(sic4_logits, dim=-1)  # [B, n4]
 
-            if have_m43:
-                # implied SIC3 distribution by summing SIC4 children
-                implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
-                parts.append(_kl_divergence(sic3_logits, implied_p3))
+                if have_m43:
+                    # implied SIC3 distribution by summing SIC4 children
+                    implied_p3 = torch.matmul(prob_4, self.M43)  # [B, n3]
+                    parts.append(_kl_divergence(sic3_logits, implied_p3))
 
-            if have_m42:
-                # implied SIC2 distribution by summing SIC4 children
-                implied_p2 = torch.matmul(prob_4, self.M42)  # [B, n2]
-                parts.append(_kl_divergence(sic2_logits, implied_p2))
+                if have_m42:
+                    # implied SIC2 distribution by summing SIC4 children
+                    implied_p2 = torch.matmul(prob_4, self.M42)  # [B, n2]
+                    parts.append(_kl_divergence(sic2_logits, implied_p2))
 
-            if parts:
-                consistency_loss = torch.stack(parts).mean()
-                losses["consistency"] = consistency_loss
-                total_loss += consistency_weight * self.loss_weights.get("consistency", 0.2) * consistency_loss
+                if parts:
+                    consistency_loss = torch.stack(parts).mean()
+                    losses["consistency"] = consistency_loss
+                    total_loss += consistency_weight * self.loss_weights.get("consistency", 0.2) * consistency_loss
 
         return {
             "loss": total_loss,
