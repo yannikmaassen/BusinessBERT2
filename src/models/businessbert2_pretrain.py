@@ -77,6 +77,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         self.consistency_warmup_ratio = consistency_warmup_ratio
         self.total_steps = total_steps
+        self.current_step = 0
         self.loss_weights = dict(loss_weights)
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
 
@@ -92,9 +93,11 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             mlm_labels: Optional[torch.Tensor] = None,
             sic2: Optional[torch.Tensor] = None,
             sic3: Optional[torch.Tensor] = None,
-            sic4: Optional[torch.Tensor] = None,
-            current_step: Optional[int] = None,
+            sic4: Optional[torch.Tensor] = None
     ):
+        if self.training:
+            self.current_step += 1
+
         transformer_outputs = self.bert.bert(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -174,10 +177,8 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         if have_m43 or have_m42:
             warmup_steps = int(self.total_steps * self.consistency_warmup_ratio)
-            step = current_step if current_step is not None else 0
-
-            if step < warmup_steps:
-                consistency_weight = current_step / warmup_steps
+            if self.current_step < warmup_steps:
+                consistency_weight = self.current_step / warmup_steps
             else:
                 consistency_weight = 1.0
 

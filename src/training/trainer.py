@@ -16,8 +16,6 @@ class MultiTaskTrainer(Trainer):
         """
         Override to log individual losses and metrics to wandb.
         """
-        inputs["current_step"] = self.state.global_step if self.state.global_step is not None else 0
-
         # Forward pass
         outputs = model(**inputs)
         loss = outputs["loss"]
