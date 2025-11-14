@@ -9,7 +9,7 @@ from src.utils.file_manager import read_jsonl
 from src.data import PretrainDatasetOnTheFly, Collator
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
-from src.utils.taxonomy import build_taxonomy_maps
+from src.utils.taxonomy_new import build_taxonomy_maps
 from src.utils.config_loader import load_config
 from src.utils.checkpoint_finder import find_latest_checkpoint
 
