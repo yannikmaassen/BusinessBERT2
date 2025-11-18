@@ -1,60 +1,51 @@
-# Pretraining configuration
+# Fixed params
 seed: 42
 model_name: bert-base-uncased
 base_tokenizer: bert-base-uncased
-max_seq_len: 512
-train_batch_size: 128
-val_batch_size: 128
-learning_rate: !!float 5e-5
-adam_epsilon: !!float 1e-8
-num_train_epochs: 10
-num_warmup_steps: 500
-num_training_steps: 1000
-num_workers: 4
-weight_decay: 0.01
-gradient_accumulation_steps: 1
-grad_clip: 1.0
-fp16: false
-logging_steps: 50
-save_total_limit: 2
-save_strategy: steps
-save_steps: 500
-evaluation_strategy: steps
-evaluation_steps: 500
-val_ratio: 0.1
-precision: bf16
-
-# MLM params
 mlm_probability: 0.15
-random_token_probability: 0.10
-keep_token_probability: 0.10
-
-# Loss weights
-loss_weights:
-  mlm: 2.0  # Increased to emphasize MLM learning
-  sop: 0.2
-  ic2: 0.7
-  ic3: 0.5
-  ic4: 0.3
-  consistency: 0.1
-
-# Progress
-report_to: wandb
-disable_tqdm: false
-
-# Debugging
-overfit_single_batch: false
-overfit_steps_per_epoch: 100
-overfit_eval_on_train_batch: false
-coarse_to_fine_weights: false
-
-# Data
-jsonl_path: "${data}"
 field_text: sentences
 field_sic2: sic2
 field_sic3: sic3
 field_sic4: sic4
 
-# Saving
+# Adjustable params
+report_to: wandb
+max_seq_len: 512
+train_batch_size: 64
+val_batch_size: 64
+lr_scheduler_type: cosine
+learning_rate: !!float 3e-5
+num_train_epochs: 1
+max_steps: 12500
+num_warmup_steps: 250
+num_workers: 4
+weight_decay: 0.01
+gradient_accumulation_steps: 2
+grad_clip: 1.0
+precision: bf16
+logging_steps: 100
+eval_strategy: steps
+eval_steps: 1000
+save_total_limit: 3
+save_strategy: steps
+save_steps: 2000
+load_best_model_at_end: False
+metric_for_best_model: "eval_loss"
+greater_is_better: False
+val_ratio: 0.1
+wandb_mode: "online"
+wandb_project: "pretrain-businessbert2"
+
+# Loss weights
+loss_weights:
+  mlm: 1.0
+  ic2: 2.0
+  ic3: 1.5
+  ic4: 1.0
+  consistency: 0.2
+
+# Data and Saving
+jsonl_path: "${data}"
 save_dir: ./outputs/pretrain
 safe_serialization: false
+save_safetensors: false

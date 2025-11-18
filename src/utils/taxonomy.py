@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import torch
 
 
@@ -9,107 +9,105 @@ def _row_normalize(m: torch.Tensor) -> torch.Tensor:
     return m / row_sums
 
 
-def build_taxonomy_maps(rows: List[dict], f2: str, f3: str, f4: str) -> Dict:
-    # Filter out "NA" values when building valid SIC code lists
-    s2 = sorted({
-        str(r.get(f2, "")).strip()
-        for r in rows
-        if str(r.get(f2, "")).strip() and str(r.get(f2, "")).strip().upper() != "NA"
-    })
-    s3 = sorted({
-        str(r.get(f3, "")).strip()
-        for r in rows
-        if str(r.get(f3, "")).strip() and str(r.get(f3, "")).strip().upper() != "NA"
-    })
-    s4 = sorted({
-        str(r.get(f4, "")).strip()
-        for r in rows
-        if str(r.get(f4, "")).strip() and str(r.get(f4, "")).strip().upper() != "NA"
-    })
-
-    idx2 = {c: i for i, c in enumerate(s2)}
-    idx3 = {c: i for i, c in enumerate(s3)}
-    idx4 = {c: i for i, c in enumerate(s4)}
-
-    parent3_to2 = {}
-    for c3 in s3:
-        parent3_to2[idx3[c3]] = idx2.get(c3[:2], None)
-
-    parent4_to3 = {}
-    for c4 in s4:
-        parent4_to3[idx4[c4]] = idx3.get(c4[:3], None)
-
-    A32 = torch.zeros((len(s3), len(s2)))
-    for i3, i2 in parent3_to2.items():
-        if i2 is not None:
-            A32[i3, i2] = 1.0
-
-    A43 = torch.zeros((len(s4), len(s3)))
-    for i4, i3 in parent4_to3.items():
-        if i3 is not None:
-            A43[i4, i3] = 1.0
-
-    B23 = _row_normalize(A32.T.clone()) if A32.numel() else A32.T.clone()
-    B34 = _row_normalize(A43.T.clone()) if A43.numel() else A43.T.clone()
-
-    return {
-        "sic2_list": s2, "sic3_list": s3, "sic4_list": s4,
-        "idx2": idx2, "idx3": idx3, "idx4": idx4,
-        "parent3_to2": parent3_to2, "parent4_to3": parent4_to3,
-        "A32": A32, "A43": A43,
-        "B23": B23, "B34": B34,
-    }
+def _normalize_code(raw: Optional[str]) -> Optional[str]:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if s == "" or s.upper() == "NA":
+        return None
+    return s
 
 
-def build_label_index_mappings(
-    sic4_code_list: List[str],
-    sic3_code_list: List[str],
+def build_code_index_mappings(
     sic2_code_list: List[str],
+    sic3_code_list: List[str],
+    sic4_code_list: List[str],
 ) -> Tuple[Dict[str, int], Dict[str, int], Dict[str, int]]:
     """
     Create string-to-index dictionaries for each SIC level.
     """
-    sic4_code_to_index = {code: index for index, code in enumerate(sorted(sic4_code_list))}
-    sic3_code_to_index = {code: index for index, code in enumerate(sorted(sic3_code_list))}
     sic2_code_to_index = {code: index for index, code in enumerate(sorted(sic2_code_list))}
+    sic3_code_to_index = {code: index for index, code in enumerate(sorted(sic3_code_list))}
+    sic4_code_to_index = {code: index for index, code in enumerate(sorted(sic4_code_list))}
 
-    return sic4_code_to_index, sic3_code_to_index, sic2_code_to_index
+    return sic2_code_to_index, sic3_code_to_index, sic4_code_to_index
 
 
-def build_child_to_parent_indicator_matrices(
-    sic4_to_sic3_mapping: Dict[str, str],
-    sic3_to_sic2_mapping: Dict[str, str],
-    sic4_code_to_index: Dict[str, int],
-    sic3_code_to_index: Dict[str, int],
-    sic2_code_to_index: Dict[str, int],
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def build_taxonomy_maps(rows: List[dict], field_sic2: str, field_sic3: str, field_sic4: str) -> Dict:
     """
-    Build dense child-to-parent indicator matrices:
-      child_to_parent_matrix_sic4_to_sic3: shape [number_sic4, number_sic3]
-      child_to_parent_matrix_sic4_to_sic2: shape [number_sic4, number_sic2]
+    Build taxonomy mappings and adjacency matrices.
 
-    These are used to sum four-digit leaf probabilities upward:
-      implied_probabilities_sic3 = probabilities_sic4 @ child_to_parent_matrix_sic4_to_sic3
-      implied_probabilities_sic2 = probabilities_sic4 @ child_to_parent_matrix_sic4_to_sic2
+    Returns keys:
+      - sic2_list, sic3_list, sic4_list: sorted lists of codes (strings)
+      - idx2, idx3, idx4: string -> index dictionaries
+      - parent3_to2: mapping i3 -> i2 (or None)
+      - parent4_to3: mapping i4 -> i3 (or None)
+      - A32: tensor [num_sic3 x num_sic2] (child->parent indicator, float32)
+      - A43: tensor [num_sic4 x num_sic3] (child->parent indicator, float32)
     """
-    number_of_sic4_classes = len(sic4_code_to_index)
-    number_of_sic3_classes = len(sic3_code_to_index)
-    number_of_sic2_classes = len(sic2_code_to_index)
+    # Collect normalized codes
+    sic2_set = set()
+    sic3_set = set()
+    sic4_set = set()
 
-    child_to_parent_matrix_sic4_to_sic3 = torch.zeros(
-        (number_of_sic4_classes, number_of_sic3_classes), dtype=torch.float32
+    for r in rows:
+        c2 = _normalize_code(r.get(field_sic2))
+        c3 = _normalize_code(r.get(field_sic3))
+        c4 = _normalize_code(r.get(field_sic4))
+        if c2 is not None:
+            sic2_set.add(c2)
+        if c3 is not None:
+            sic3_set.add(c3)
+        if c4 is not None:
+            sic4_set.add(c4)
+
+    # Deterministic sorted lists
+    sic2_list = sorted(sic2_set)
+    sic3_list = sorted(sic3_set)
+    sic4_list = sorted(sic4_set)
+
+    # Index mappings
+    indexed_sic2_list, indexed_sic3_list, indexed_sic4_list = (
+        build_code_index_mappings(sic2_list, sic3_list, sic4_list)
     )
-    child_to_parent_matrix_sic4_to_sic2 = torch.zeros(
-        (number_of_sic4_classes, number_of_sic2_classes), dtype=torch.float32
-    )
 
-    for sic4_code, sic3_parent_code in sic4_to_sic3_mapping.items():
-        sic4_index = sic4_code_to_index[sic4_code]
-        sic3_index = sic3_code_to_index[sic3_parent_code]
-        child_to_parent_matrix_sic4_to_sic3[sic4_index, sic3_index] = 1.0
+    # Parent mappings using correct index maps
+    parent3_to2: Dict[int, Optional[int]] = {}
+    for sic3 in sic3_list:
+        i3 = indexed_sic3_list[sic3]
+        parent_code = sic3[:2]  # first two digits for SIC2 parent
+        i2 = indexed_sic2_list.get(parent_code, None)
+        parent3_to2[i3] = i2
 
-        sic2_parent_code = sic3_to_sic2_mapping[sic3_parent_code]
-        sic2_index = sic2_code_to_index[sic2_parent_code]
-        child_to_parent_matrix_sic4_to_sic2[sic4_index, sic2_index] = 1.0
+    parent4_to3: Dict[int, Optional[int]] = {}
+    for sic4 in sic4_list:
+        i4 = indexed_sic4_list[sic4]
+        parent_code = sic4[:3]  # first three digits for SIC3 parent
+        i3 = indexed_sic3_list.get(parent_code, None)
+        parent4_to3[i4] = i3
 
-    return child_to_parent_matrix_sic4_to_sic3, child_to_parent_matrix_sic4_to_sic2
+    # Indicator matrices (child rows x parent cols), float32 and contiguous
+    A32 = torch.zeros((len(sic3_list), len(sic2_list)), dtype=torch.float32)
+    for i3, i2 in parent3_to2.items():
+        if i2 is not None:
+            A32[i3, i2] = 1.0
+    A32 = A32.contiguous()
+
+    A43 = torch.zeros((len(sic4_list), len(sic3_list)), dtype=torch.float32)
+    for i4, i3 in parent4_to3.items():
+        if i3 is not None:
+            A43[i4, i3] = 1.0
+    A43 = A43.contiguous()
+
+    return {
+        "sic2_list": sic2_list,
+        "sic3_list": sic3_list,
+        "sic4_list": sic4_list,
+        "idx2": indexed_sic2_list,
+        "idx3": indexed_sic3_list,
+        "idx4": indexed_sic4_list,
+        "parent3_to2": parent3_to2,
+        "parent4_to3": parent4_to3,
+        "A32": A32,
+        "A43": A43,
+    }

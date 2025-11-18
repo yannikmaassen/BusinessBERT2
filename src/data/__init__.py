@@ -1,7 +1,10 @@
-from .examples import PretrainExample, make_examples
-from .dataset import PretrainDataset
+from .dataset_chunking import PretrainDataset
+from .dataset_sampling import PretrainDatasetRandomSampling, PretrainDatasetOnTheFly
 from .collator import Collator
 
 __all__ = [
-    "PretrainExample", "make_examples", "PretrainDataset", "Collator"
+    "PretrainDataset",
+    "PretrainDatasetRandomSampling",
+    "PretrainDatasetOnTheFly",
+    "Collator"
 ]
