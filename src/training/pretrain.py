@@ -120,6 +120,7 @@ def main():
         per_device_train_batch_size=config["train_batch_size"],
         per_device_eval_batch_size=config["val_batch_size"],
         warmup_steps=config["num_warmup_steps"],
+        lr_scheduler_type=config["lr_scheduler_type"],
         learning_rate=config["learning_rate"],
         weight_decay=config["weight_decay"],
         logging_steps=config["logging_steps"],

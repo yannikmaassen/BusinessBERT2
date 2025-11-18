@@ -26,6 +26,7 @@ train-data-colab:
 		--report_to $(REPORT_TO) \
 		--max_seq_length $(MAX_SEQ_LENGTH) \
 		--batch_size $(BATCH_SIZE) \
+		--lr_scheduler_type $(LR_SCHEDULER_TYPE) \
 		--learning_rate $(LEARNING_RATE) \
 		--num_train_epochs $(NUM_TRAIN_EPOCHS) \
 		--max_steps $(MAX_STEPS) \

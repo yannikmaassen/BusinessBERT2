@@ -22,6 +22,7 @@ def parse_cli_args():
     parser.add_argument("--report_to", required=False, help="Optional: override report_to in config")
     parser.add_argument("--max_seq_length", required=False, help="Optional: override max_seq_length")
     parser.add_argument("--batch_size", required=False, help="Optional: override batch_size")
+    parser.add_argument("--lr_scheduler_type", required=False, help="Optional: override lr_scheduler_type")
     parser.add_argument("--learning_rate", required=False, help="Optional: override learning_rate")
     parser.add_argument("--num_train_epochs", required=False, help="Optional: override num_train_epochs")
     parser.add_argument("--max_steps", required=False, help="Optional: override max_steps")
@@ -65,6 +66,9 @@ def parse_cli_args():
 
     if args.batch_size is not None:
         args.batch_size = int(args.batch_size)
+
+    if args.lr_scheduler_type is not None:
+        args.lr_scheduler_type = str(args.lr_scheduler_type)
 
     if args.learning_rate is not None:
         args.learning_rate = float(args.learning_rate)

@@ -22,6 +22,8 @@ def load_config(args) -> Dict:
     if getattr(args, "batch_size", None) is not None:
         config["train_batch_size"] = args.batch_size
         config["val_batch_size"] = args.batch_size
+    if getattr(args, "lr_scheduler_type", None) is not None:
+        config["lr_scheduler_type"] = args.lr_scheduler_type
     if getattr(args, "learning_rate", None) is not None:
         config["learning_rate"] = args.learning_rate
     if getattr(args, "num_train_epochs", None) is not None:
