@@ -22,12 +22,3 @@ def top1_accuracy(logits: torch.Tensor, labels: torch.Tensor) -> Tuple[int, int]
     total = mask.sum().item()
 
     return correct, total
-
-
-@torch.no_grad()
-def binary_accuracy(logits: torch.Tensor, labels: torch.Tensor) -> Tuple[int, int]:
-    predictions = logits.argmax(dim=-1)
-    correct = (predictions == labels).sum().item()
-    total = labels.numel()
-
-    return correct, total
