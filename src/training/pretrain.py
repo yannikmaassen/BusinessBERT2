@@ -157,7 +157,7 @@ def main():
         data_collator=data_collator,
         taxonomy_maps=taxonomy_maps,
         total_steps=total_steps,
-        optimizers=optimizer,
+        optimizers=(optimizer, None),
     )
 
     last_checkpoint = find_latest_checkpoint(config["save_dir"])
