@@ -13,7 +13,7 @@ class PretrainDatasetOnTheFlyNew(Dataset):
         indexed_sic2_list: Dict[str, int],
         indexed_sic3_list: Dict[str, int],
         indexed_sic4_list: Dict[str, int],
-        is_training: bool = True,
+        # is_training: bool = True,
     ):
         self.raw_examples = raw_examples
         self.tokenizer = tokenizer
@@ -21,7 +21,7 @@ class PretrainDatasetOnTheFlyNew(Dataset):
         self.indexed_sic2_list = indexed_sic2_list
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
-        self.is_training = is_training
+        # self.is_training = is_training
 
         self.cls_token_id = tokenizer.cls_token_id
         self.sep_token_id = tokenizer.sep_token_id
