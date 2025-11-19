@@ -33,14 +33,6 @@ def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
     return M43, M42
 
 
-def _init_weights(self, module):
-    """Initialize weights like BERT does"""
-    if isinstance(module, nn.Linear):
-        module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
-        if module.bias is not None:
-            module.bias.data.zero_()
-
-
 class BusinessBERT2Pretrain(BertPreTrainedModel):
     """
     BERT encoder with:
@@ -75,10 +67,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.head_sic2 = nn.Linear(config.hidden_size, n_sic2_classes)
         self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
         self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
-
-        self._init_weights(self.head_sic2)
-        self._init_weights(self.head_sic3)
-        self._init_weights(self.head_sic4)
 
         # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
