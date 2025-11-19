@@ -3,6 +3,7 @@ import random
 import wandb
 from sklearn.model_selection import train_test_split
 import torch
+from torch.optim import AdamW
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
@@ -141,6 +142,13 @@ def main():
         save_safetensors=config["save_safetensors"]
     )
 
+    optimizer_grouped_params = model.get_optimizer_grouped_parameters(
+        learning_rate=config["learning_rate"],
+        weight_decay=config["weight_decay"]
+    )
+
+    optimizer = AdamW(optimizer_grouped_params)
+
     trainer = MultiTaskTrainer(
         model=model,
         args=training_args,
@@ -149,6 +157,7 @@ def main():
         data_collator=data_collator,
         taxonomy_maps=taxonomy_maps,
         total_steps=total_steps,
+        optimizers=optimizer,
     )
 
     last_checkpoint = find_latest_checkpoint(config["save_dir"])
