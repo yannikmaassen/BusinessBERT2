@@ -39,9 +39,9 @@ wandb_project: "pretrain-businessbert2"
 # Loss weights
 loss_weights:
   mlm: 1.0
-  ic2: 1.0
-  ic3: 0.8
-  ic4: 0.6
+  ic2: 0.5
+  ic3: 0.4
+  ic4: 0.3
   consistency: 0.2
 
 # Data and Saving
