@@ -68,6 +68,27 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
         self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
 
+        # self.head_sic2 = nn.Sequential(
+        #     nn.Linear(config.hidden_size, config.hidden_size),
+        #     nn.Tanh(),
+        #     nn.Dropout(0.3),
+        #     nn.Linear(config.hidden_size, n_sic2_classes),
+        # )
+        #
+        # self.head_sic3 = nn.Sequential(
+        #     nn.Linear(config.hidden_size, config.hidden_size),
+        #     nn.Tanh(),
+        #     nn.Dropout(0.3),
+        #     nn.Linear(config.hidden_size, n_sic3_classes),
+        # )
+        #
+        # self.head_sic4 = nn.Sequential(
+        #     nn.Linear(config.hidden_size, config.hidden_size),
+        #     nn.Tanh(),
+        #     nn.Dropout(0.3),
+        #     nn.Linear(config.hidden_size, n_sic4_classes),
+        # )
+
         # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
         # M42: [|SIC4| x |SIC2|] = A43 @ A32 to sum leaf probs upward to SIC2
@@ -80,6 +101,10 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.current_step = 0
         self.loss_weights = dict(loss_weights)
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
+        self.cross_entropy_ic = nn.CrossEntropyLoss(
+            ignore_index=-100,
+            label_smoothing=0.1  # Add smoothing for IC tasks
+        )
 
         # Only reinit if not loading pretrained weights
         if not base_model_name:
@@ -128,7 +153,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
         # ----- IC cross-entropy at each level -----
         if sic2_logits is not None and sic2 is not None:
-            ic2_loss = self.cross_entropy(sic2_logits, sic2)
+            ic2_loss = self.cross_entropy_ic(sic2_logits, sic2)
             losses["ic2"] = ic2_loss
             total_loss += self.loss_weights["ic2"] * ic2_loss
 
@@ -138,7 +163,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 metrics["ic2_accuracy"] = torch.tensor(correct / total)
 
         if sic3_logits is not None and sic3 is not None:
-            ic3_loss = self.cross_entropy(sic3_logits, sic3)
+            ic3_loss = self.cross_entropy_ic(sic3_logits, sic3)
             losses["ic3"] = ic3_loss
             total_loss += self.loss_weights["ic3"] * ic3_loss
 
@@ -148,7 +173,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 metrics["ic3_accuracy"] = torch.tensor(correct / total)
 
         if sic4_logits is not None and sic4 is not None:
-            ic4_loss = self.cross_entropy(sic4_logits, sic4)
+            ic4_loss = self.cross_entropy_ic(sic4_logits, sic4)
             losses["ic4"] = ic4_loss
             total_loss += self.loss_weights["ic4"] * ic4_loss
 
@@ -213,3 +238,49 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             "ic3_logits": sic3_logits,
             "ic4_logits": sic4_logits,
         }
+
+    def get_optimizer_grouped_parameters(self, learning_rate: float, weight_decay: float = 0.01):
+        """
+        Group parameters with different learning rates.
+        IC heads get lower LR to prevent overfitting on fewer examples.
+        """
+        no_decay = ["bias", "LayerNorm.weight"]
+
+        ic_lr_ratio = 0.2  # IC heads get 10% of base LR
+
+        optimizer_grouped_parameters = [
+            # BERT encoder params (no decay)
+            {
+                "params": [p for n, p in self.bert.named_parameters()
+                           if not any(nd in n for nd in no_decay)],
+                "weight_decay": weight_decay,
+                "lr": learning_rate,
+            },
+            {
+                "params": [p for n, p in self.bert.named_parameters()
+                           if any(nd in n for nd in no_decay)],
+                "weight_decay": 0.0,
+                "lr": learning_rate,
+            },
+            # IC heads with reduced LR (no decay)
+            {
+                "params": [p for n, p in self.head_sic2.named_parameters()
+                           if not any(nd in n for nd in no_decay)],
+                "weight_decay": weight_decay,
+                "lr": learning_rate * ic_lr_ratio,
+            },
+            {
+                "params": [p for n, p in self.head_sic3.named_parameters()
+                           if not any(nd in n for nd in no_decay)],
+                "weight_decay": weight_decay,
+                "lr": learning_rate * ic_lr_ratio,
+            },
+            {
+                "params": [p for n, p in self.head_sic4.named_parameters()
+                           if not any(nd in n for nd in no_decay)],
+                "weight_decay": weight_decay,
+                "lr": learning_rate * ic_lr_ratio,
+            },
+        ]
+
+        return optimizer_grouped_parameters

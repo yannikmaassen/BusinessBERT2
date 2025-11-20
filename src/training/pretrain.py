@@ -3,10 +3,11 @@ import random
 import wandb
 from sklearn.model_selection import train_test_split
 import torch
+from torch.optim import AdamW
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
-from src.data import PretrainDatasetOnTheFly, Collator
+from src.data import PretrainDatasetOnTheFly, Collator, PretrainDatasetOnTheFlyNew
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
@@ -84,8 +85,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDatasetOnTheFly(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
-    val_dataset   = PretrainDatasetOnTheFly(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
+    train_dataset = PretrainDatasetOnTheFlyNew(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
+    val_dataset   = PretrainDatasetOnTheFlyNew(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
 
     data_collator = Collator(tokenizer=tokenizer)
 
@@ -141,6 +142,13 @@ def main():
         save_safetensors=config["save_safetensors"]
     )
 
+    optimizer_grouped_params = model.get_optimizer_grouped_parameters(
+        learning_rate=config["learning_rate"],
+        weight_decay=config["weight_decay"]
+    )
+
+    optimizer = AdamW(optimizer_grouped_params)
+
     trainer = MultiTaskTrainer(
         model=model,
         args=training_args,
@@ -149,6 +157,7 @@ def main():
         data_collator=data_collator,
         taxonomy_maps=taxonomy_maps,
         total_steps=total_steps,
+        optimizers=(optimizer, None),
     )
 
     last_checkpoint = find_latest_checkpoint(config["save_dir"])

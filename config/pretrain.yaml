@@ -14,7 +14,7 @@ max_seq_len: 512
 train_batch_size: 64
 val_batch_size: 64
 lr_scheduler_type: cosine
-learning_rate: !!float 3e-5
+learning_rate: !!float 5e-5
 num_train_epochs: 1
 max_steps: 12500
 num_warmup_steps: 250
@@ -39,9 +39,9 @@ wandb_project: "pretrain-businessbert2"
 # Loss weights
 loss_weights:
   mlm: 1.0
-  ic2: 2.0
-  ic3: 1.5
-  ic4: 1.0
+  ic2: 0.5
+  ic3: 0.4
+  ic4: 0.3
   consistency: 0.2
 
 # Data and Saving
