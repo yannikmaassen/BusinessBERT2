@@ -85,8 +85,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDatasetOnTheFlyNew(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
-    val_dataset   = PretrainDatasetOnTheFlyNew(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
+    train_dataset = PretrainDatasetOnTheFlyNew(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], is_training=True)
+    val_dataset   = PretrainDatasetOnTheFlyNew(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], is_training=False)
 
     data_collator = Collator(tokenizer=tokenizer)
 
