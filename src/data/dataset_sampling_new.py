@@ -13,7 +13,7 @@ class PretrainDatasetOnTheFlyNew(Dataset):
         indexed_sic2_list: Dict[str, int],
         indexed_sic3_list: Dict[str, int],
         indexed_sic4_list: Dict[str, int],
-        is_training: bool = True,
+        # is_training: bool = True,
     ):
         self.raw_examples = raw_examples
         self.tokenizer = tokenizer
@@ -21,7 +21,7 @@ class PretrainDatasetOnTheFlyNew(Dataset):
         self.indexed_sic2_list = indexed_sic2_list
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
-        self.is_training = is_training
+        # self.is_training = is_training
 
         self.cls_token_id = tokenizer.cls_token_id
         self.sep_token_id = tokenizer.sep_token_id
@@ -56,15 +56,15 @@ class PretrainDatasetOnTheFlyNew(Dataset):
         body_max_len = self.max_length - 2
 
         if seq_len > body_max_len:
-            if self.is_training:
-                # Random sampling for training
-                max_start = seq_len - body_max_len
-                start_idx = random.randint(0, max_start)
-            else:
-                # Deterministic sampling for validation (first window)
-                start_idx = 0
-            # max_start = seq_len - body_max_len
-            # start_idx = random.randint(0, max_start)
+            # if self.is_training:
+            #     # Random sampling for training
+            #     max_start = seq_len - body_max_len
+            #     start_idx = random.randint(0, max_start)
+            # else:
+            #     # Deterministic sampling for validation (first window)
+            #     start_idx = 0
+            max_start = seq_len - body_max_len
+            start_idx = random.randint(0, max_start)
 
             body_ids = input_ids[start_idx:start_idx + body_max_len]
             body_mask = attention_mask[start_idx:start_idx + body_max_len]
