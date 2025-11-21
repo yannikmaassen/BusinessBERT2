@@ -39,7 +39,7 @@ wandb_project: "pretrain-businessbert2"
 # Loss weights
 loss_weights:
   mlm: 1.0
-  nsp: 1.0
+  nsp: 0.5
   ic2: 0.5
   ic3: 0.4
   ic4: 0.3
