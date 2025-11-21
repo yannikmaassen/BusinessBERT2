@@ -54,7 +54,7 @@ def parse_cli_args():
         print(f"No config path specified, using default: {args.config}")
 
     if args.data is None:
-        args.data = os.path.join(os.path.dirname(__file__), "..", "..", "data", "sample.jsonl")
+        args.data = os.path.join(os.path.dirname(__file__), "..", "..", "data", "pretraining_dataset_large_test_sample.jsonl")
         print(f"No data path specified, using default: {args.data}")
 
     if args.report_to is None:
