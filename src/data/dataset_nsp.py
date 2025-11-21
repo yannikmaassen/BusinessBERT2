@@ -27,9 +27,6 @@ class PretrainDatasetWithNSP(Dataset):
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
 
-        self.cls_token_id = tokenizer.cls_token_id
-        self.sep_token_id = tokenizer.sep_token_id
-
         # Filter valid examples
         self.valid_examples = []
         for example in tqdm(raw_examples, desc="Filtering valid examples"):
