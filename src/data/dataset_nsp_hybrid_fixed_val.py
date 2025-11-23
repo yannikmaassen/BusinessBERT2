@@ -5,14 +5,7 @@ from transformers import PreTrainedTokenizer
 from tqdm import tqdm
 
 
-class PretrainDatasetWithNSPOptimized(Dataset):
-    """
-    Optimized NSP dataset that:
-    - Preserves sentence boundaries for MLM quality
-    - Maximally fills token budget for efficiency
-    - Samples from full document for IC coverage
-    """
-
+class PretrainDatasetWithNSPOptimizedFixedEval(Dataset):
     def __init__(
             self,
             raw_examples: List[Dict[str, Any]],
@@ -21,6 +14,8 @@ class PretrainDatasetWithNSPOptimized(Dataset):
             indexed_sic2_list: Dict[str, int],
             indexed_sic3_list: Dict[str, int],
             indexed_sic4_list: Dict[str, int],
+            is_training: bool = True,
+            seed: int = 42,
     ):
         self.raw_examples = raw_examples
         self.tokenizer = tokenizer
@@ -28,18 +23,124 @@ class PretrainDatasetWithNSPOptimized(Dataset):
         self.indexed_sic2_list = indexed_sic2_list
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
+        self.is_training = is_training
 
         self.max_total_tokens = max_length - 3
         self.per_segment_budget = self.max_total_tokens // 2
 
         self.valid_examples = [
-            ex for ex in tqdm(raw_examples, desc="Filtering valid examples")
-            if ex.get("sentences") and len(ex.get("sentences", [])) >= 2
+            ex for ex in raw_examples if ex.get("sentences")
         ]
 
+        if not is_training:
+            self._prebuilt_examples = self._prebuild_validation_examples(seed)
 
 
     def __getitem__(self, idx) -> Dict[str, Any]:
+        if self.is_training:
+            # Training: random sampling each time
+            return self._get_random_example(idx)
+        else:
+            # Validation: return pre-built example
+            return self._get_prebuilt_example(idx)
+
+
+    def _prebuild_validation_examples(self, seed: int) -> List[Dict[str, Any]]:
+        """Pre-build validation examples with fixed random seed."""
+        rng = random.Random(seed)
+        prebuilt = []
+
+        for example_a in tqdm(self.valid_examples, desc="Pre-building validation examples"):
+            sentences = example_a.get("sentences", [])
+
+            # Use fixed RNG for validation
+            is_next = rng.random() < 0.5
+
+            if is_next:
+                max_start = max(0, len(sentences) - 2)
+                start_idx = rng.randint(0, max_start)
+
+                a_ids, next_idx = self._build_sentence_aware_segment(
+                    sentences, start_idx, self.per_segment_budget
+                )
+
+                remaining_budget = self.max_total_tokens - len(a_ids)
+
+                if next_idx >= len(sentences):
+                    next_idx = max(start_idx + 1, len(sentences) - 1)
+
+                b_ids = self._fill_remaining_tokens(
+                    sentences, next_idx, remaining_budget
+                )
+
+                nsp_label = 0
+                meta_example = example_a
+            else:
+                start_idx = rng.randint(0, len(sentences) - 1)
+
+                a_ids, _ = self._build_sentence_aware_segment(
+                    sentences, start_idx, self.per_segment_budget
+                )
+
+                remaining_budget = self.max_total_tokens - len(a_ids)
+
+                example_b = rng.choice(self.valid_examples)
+                while example_b is example_a and len(self.valid_examples) > 1:
+                    example_b = rng.choice(self.valid_examples)
+
+                b_sentences = example_b.get("sentences", [])
+                b_start = rng.randint(0, len(b_sentences) - 1)
+
+                b_ids = self._fill_remaining_tokens(
+                    b_sentences, b_start, remaining_budget
+                )
+
+                nsp_label = 1
+                meta_example = example_a
+
+            prebuilt.append({
+                'a_ids': a_ids,
+                'b_ids': b_ids,
+                'nsp_label': nsp_label,
+                'meta_example': meta_example,
+            })
+
+        return prebuilt
+
+
+    def _get_prebuilt_example(self, idx) -> Dict[str, Any]:
+        """Return pre-built validation example."""
+        prebuilt = self._prebuilt_examples[idx]
+
+        input_ids = self.tokenizer.build_inputs_with_special_tokens(
+            prebuilt['a_ids'], prebuilt['b_ids']
+        )
+        token_type_ids = self.tokenizer.create_token_type_ids_from_sequences(
+            prebuilt['a_ids'], prebuilt['b_ids']
+        )
+        attention_mask = [1] * len(input_ids)
+
+        # Padding
+        if len(input_ids) < self.max_length:
+            pad_len = self.max_length - len(input_ids)
+            pad_id = self.tokenizer.pad_token_id or 0
+            input_ids += [pad_id] * pad_len
+            attention_mask += [0] * pad_len
+            token_type_ids += [0] * pad_len
+
+        meta = prebuilt['meta_example']
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "token_type_ids": token_type_ids,
+            "nsp_labels": prebuilt['nsp_label'],
+            "sic2": self._map_raw_sic_code_to_index(meta.get("sic2"), self.indexed_sic2_list),
+            "sic3": self._map_raw_sic_code_to_index(meta.get("sic3"), self.indexed_sic3_list),
+            "sic4": self._map_raw_sic_code_to_index(meta.get("sic4"), self.indexed_sic4_list),
+        }
+
+    def _get_random_example(self, idx) -> Dict[str, Any]:
         example_a = self.valid_examples[idx]
         sentences = example_a.get("sentences", [])
 
