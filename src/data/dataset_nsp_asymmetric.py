@@ -1,15 +1,15 @@
 import random
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer
 from tqdm import tqdm
 
 
-class PretrainDatasetWithNSPSegmentsMax(Dataset):
+class PretrainDatasetWithNSPAsymmetric(Dataset):
     """
-    Builds paired segments for NSP with half-token allocation per side.
-    Tokenizes full document, samples a 512-token window (or full doc if shorter),
-    then splits in half for segments A and B.
+    Asymmetric segment allocation for better CLS representation.
+    Allocates segment_a_ratio (e.g., 0.6-0.8) of tokens to segment A,
+    remainder to segment B. Always fills to max_length for optimal MLM.
     """
 
     def __init__(
@@ -20,6 +20,7 @@ class PretrainDatasetWithNSPSegmentsMax(Dataset):
             indexed_sic2_list: Dict[str, int],
             indexed_sic3_list: Dict[str, int],
             indexed_sic4_list: Dict[str, int],
+            segment_a_ratio: float = 0.8,  # 75% to segment A by default
     ):
         self.raw_examples = raw_examples
         self.tokenizer = tokenizer
@@ -28,19 +29,19 @@ class PretrainDatasetWithNSPSegmentsMax(Dataset):
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
 
-        # Budget excluding special tokens ([CLS], [SEP], [SEP])
-        self.per_segment_budget = (self.max_length - 3) // 2
+        self.segment_a_ratio = segment_a_ratio
 
-        # Keep examples that contain either raw text or sentences
+        # Budget excluding special tokens ([CLS], [SEP], [SEP])
+        total_budget = self.max_length - 3
+        self.segment_a_budget = int(total_budget * segment_a_ratio)
+        self.segment_b_budget = total_budget - self.segment_a_budget
+
         self.valid_examples = [
             ex for ex in tqdm(raw_examples, desc="Filtering valid examples")
             if ex.get("sentences")
         ]
 
     def _get_full_text_from_example(self, ex: Dict[str, Any]) -> str:
-        """
-        Return raw text for an example. Prefer 'text', fallback to joining 'sentences'.
-        """
         sentences = ex.get("sentences") or []
         return " ".join(sentences)
 
@@ -54,32 +55,30 @@ class PretrainDatasetWithNSPSegmentsMax(Dataset):
         is_next = random.random() < 0.5
 
         if is_next:
-            # Positive: sample window of 2*budget tokens, split in half
-            total_budget = 2 * self.per_segment_budget
+            # Positive: sample window, then split asymmetrically
+            total_budget = self.segment_a_budget + self.segment_b_budget
 
             if len(tokenized_a) <= total_budget:
-                # Use full document
                 window = tokenized_a
             else:
-                # Sample random window
                 max_start = len(tokenized_a) - total_budget
                 start = random.randint(0, max_start)
                 window = tokenized_a[start:start + total_budget]
 
-            # Split in half
-            mid = len(window) // 2
-            a_ids = window[:mid]
-            b_ids = window[mid:]
+            # Asymmetric split
+            a_ids = window[:self.segment_a_budget]
+            b_ids = window[self.segment_a_budget:]
+
             nsp_label = 0
             meta_example = example_a
         else:
             # Negative: A from current doc, B from different doc
-            if len(tokenized_a) <= self.per_segment_budget:
+            if len(tokenized_a) <= self.segment_a_budget:
                 a_ids = tokenized_a
             else:
-                max_start = len(tokenized_a) - self.per_segment_budget
+                max_start = len(tokenized_a) - self.segment_a_budget
                 start = random.randint(0, max_start)
-                a_ids = tokenized_a[start:start + self.per_segment_budget]
+                a_ids = tokenized_a[start:start + self.segment_a_budget]
 
             # Get segment B from different document
             example_b = random.choice(self.valid_examples)
@@ -89,12 +88,12 @@ class PretrainDatasetWithNSPSegmentsMax(Dataset):
             full_text_b = self._get_full_text_from_example(example_b)
             tokenized_b = self.tokenizer(full_text_b, add_special_tokens=False)["input_ids"]
 
-            if len(tokenized_b) <= self.per_segment_budget:
+            if len(tokenized_b) <= self.segment_b_budget:
                 b_ids = tokenized_b
             else:
-                max_start = len(tokenized_b) - self.per_segment_budget
+                max_start = len(tokenized_b) - self.segment_b_budget
                 start = random.randint(0, max_start)
-                b_ids = tokenized_b[start:start + self.per_segment_budget]
+                b_ids = tokenized_b[start:start + self.segment_b_budget]
 
             nsp_label = 1
             meta_example = example_a
@@ -107,7 +106,6 @@ class PretrainDatasetWithNSPSegmentsMax(Dataset):
         # Pad to max_length
         if len(input_ids) < self.max_length:
             pad_len = self.max_length - len(input_ids)
-            print(f"Padding legth: {pad_len}")
             pad_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
             input_ids = input_ids + [pad_id] * pad_len
             attention_mask = attention_mask + [0] * pad_len
@@ -117,8 +115,6 @@ class PretrainDatasetWithNSPSegmentsMax(Dataset):
         sic3 = self._map_raw_sic_code_to_index(meta_example.get("sic3"), self.indexed_sic3_list)
         sic4 = self._map_raw_sic_code_to_index(meta_example.get("sic4"), self.indexed_sic4_list)
 
-        print(f"DEBUG: input_ids length: {len(input_ids)}, attention_mask length: {len(attention_mask)}, token_type_ids length: {len(token_type_ids)}")
-        exit(0)
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
