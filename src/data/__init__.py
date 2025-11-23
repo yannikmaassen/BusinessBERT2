@@ -3,6 +3,7 @@ from .dataset_nsp import PretrainDatasetWithNSP
 from .dataset_nsp_segment import PretrainDatasetWithNSPSegments
 from .dataset_nsp_max import PretrainDatasetWithNSPSegmentsMax
 from .dataset_nsp_asymmetric import PretrainDatasetWithNSPAsymmetric
+from .dataset_nsp_asymmetric_fixed_val import PretrainDatasetWithNSPAsymmetricFixedEval
 from .dataset_nsp_hybrid import PretrainDatasetWithNSPOptimized
 from .dataset_nsp_hybrid_fixed_val import PretrainDatasetWithNSPOptimizedFixedEval
 from .dataset_sampling import PretrainDatasetRandomSampling, PretrainDatasetOnTheFly
@@ -14,6 +15,7 @@ __all__ = [
     "PretrainDatasetWithNSPSegments",
     "PretrainDatasetWithNSPSegmentsMax",
     "PretrainDatasetWithNSPAsymmetric",
+    "PretrainDatasetWithNSPAsymmetricFixedEval",
     "PretrainDatasetWithNSPOptimized",
     "PretrainDatasetWithNSPOptimizedFixedEval",
     "PretrainDataset",

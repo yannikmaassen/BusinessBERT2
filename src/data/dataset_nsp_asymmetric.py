@@ -20,7 +20,7 @@ class PretrainDatasetWithNSPAsymmetric(Dataset):
             indexed_sic2_list: Dict[str, int],
             indexed_sic3_list: Dict[str, int],
             indexed_sic4_list: Dict[str, int],
-            segment_a_ratio: float = 0.8,  # 75% to segment A by default
+            segment_a_ratio: float = 0.8,
     ):
         self.raw_examples = raw_examples
         self.tokenizer = tokenizer

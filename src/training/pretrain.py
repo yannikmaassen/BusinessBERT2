@@ -15,6 +15,7 @@ from src.data import (
     PretrainDatasetWithNSPSegments,
     PretrainDatasetWithNSPSegmentsMax,
     PretrainDatasetWithNSPAsymmetric,
+    PretrainDatasetWithNSPAsymmetricFixedEval,
     PretrainDatasetWithNSPOptimized,
     PretrainDatasetWithNSPOptimizedFixedEval
 )
@@ -95,8 +96,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDatasetWithNSPAsymmetric(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
-    val_dataset   = PretrainDatasetWithNSPAsymmetric(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"])
+    train_dataset = PretrainDatasetWithNSPAsymmetricFixedEval(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], is_training=True)
+    val_dataset   = PretrainDatasetWithNSPAsymmetricFixedEval(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], is_training=False, seed=config["seed"])
 
     data_collator = Collator(tokenizer=tokenizer)
 
