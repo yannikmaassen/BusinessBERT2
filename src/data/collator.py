@@ -9,7 +9,7 @@ from transformers import (
 @dataclass
 class Collator:
     tokenizer: PreTrainedTokenizerBase
-    mlm_probability: float = 0.15
+    mlm_probability: float = 0.30
 
     def __post_init__(self):
         self._mlm = DataCollatorForLanguageModeling(

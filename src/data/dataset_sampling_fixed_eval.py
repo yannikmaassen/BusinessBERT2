@@ -118,8 +118,6 @@ class PretrainDatasetOnTheFlyNewFixedEval(Dataset):
         attention_mask: List[int] = encoding["attention_mask"]
         seq_len = len(input_ids)
 
-        print(f"Length full encoding input ids: {len(input_ids)}")
-
         body_max_len = self.max_length - 2
 
         if seq_len > body_max_len:
@@ -137,7 +135,6 @@ class PretrainDatasetOnTheFlyNewFixedEval(Dataset):
         pad_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else 0
         if len(input_ids) < self.max_length:
             pad_len = self.max_length - len(input_ids)
-            print(f"Padding length: {pad_len}")
             input_ids += [pad_id] * pad_len
             attention_mask += [0] * pad_len
 
