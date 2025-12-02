@@ -8,8 +8,6 @@ from transformers import AutoTokenizer
 from src.utils.file_manager import read_jsonl
 
 def analyze_tokenization(texts: List[str], tokenizer, field_name):
-    """Analyze tokenization patterns and identify potentially problematic tokens."""
-    # Calculate token frequencies
     token_counter = collections.Counter()
     unknown_counter = collections.Counter()
     seq_lengths = []
@@ -18,11 +16,9 @@ def analyze_tokenization(texts: List[str], tokenizer, field_name):
         if not text:
             continue
 
-        # Tokenize the text
         tokens = tokenizer.tokenize(text)
         seq_lengths.append(len(tokens))
 
-        # Count tokens
         token_counter.update(tokens)
 
         # Track unknown tokens
@@ -35,7 +31,6 @@ def analyze_tokenization(texts: List[str], tokenizer, field_name):
                 if idx < len(words):
                     unknown_counter.update([words[idx]])
 
-    # Calculate statistics
     stats = {
         "total_texts": len(texts),
         "total_tokens": sum(seq_lengths),
@@ -68,7 +63,6 @@ def analyze_tokenization(texts: List[str], tokenizer, field_name):
     # Plot token frequency distribution
     plt.figure(figsize=(12, 6))
 
-    # Get top 100 tokens
     top_tokens = token_counter.most_common(100)
     tokens, counts = zip(*top_tokens)
 
@@ -85,23 +79,19 @@ def main():
     parser.add_argument("--data", type=str, required=True, help="Path to the JSONL dataset")
     args = parser.parse_args()
 
-    # Load dataset
     print(f"Loading dataset from {args.data}")
     dataset = read_jsonl(args.data)
     print(f"Loaded {len(dataset)} rows")
 
-    # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     field = "sentences"
 
-    # Extract texts
     all_texts = []
     for row in dataset:
         sentences = row.get(field, [])
         if not isinstance(sentences, list):
             continue
 
-        # Join all sentences for this example
         text = " ".join(sentences)
         if text.strip():
             all_texts.append(text)

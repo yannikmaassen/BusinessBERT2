@@ -19,7 +19,6 @@ def _kl_divergence(predicted_logits, implied_probs, eps: float = 1e-8):
 
 
 def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
-    # Create M43 and M42 matrices from A43 and A32
     if A43.numel():
         M43 = A43.clone().to(torch.float32).contiguous()
     else:
@@ -34,14 +33,6 @@ def create_buffers(A43: torch.Tensor, A32: torch.Tensor):
 
 
 class BusinessBERT2Pretrain(BertPreTrainedModel):
-    """
-    BERT encoder with:
-      - MLM (token-level)
-      - IC hierarchical (SIC2/3/4) + upward consistency (SIC4→SIC3 and SIC4→SIC2 via KL)
-        * Multi-level cross-entropy at SIC2, SIC3, SIC4
-        * Consistency encourages ancestor heads (SIC2/SIC3) to match leaf-implied marginals from SIC4
-    """
-
     def __init__(
         self,
         config: BertConfig,
@@ -68,27 +59,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.head_sic3 = nn.Linear(config.hidden_size, n_sic3_classes)
         self.head_sic4 = nn.Linear(config.hidden_size, n_sic4_classes)
 
-        # self.head_sic2 = nn.Sequential(
-        #     nn.Linear(config.hidden_size, config.hidden_size),
-        #     nn.Tanh(),
-        #     nn.Dropout(0.3),
-        #     nn.Linear(config.hidden_size, n_sic2_classes),
-        # )
-        #
-        # self.head_sic3 = nn.Sequential(
-        #     nn.Linear(config.hidden_size, config.hidden_size),
-        #     nn.Tanh(),
-        #     nn.Dropout(0.3),
-        #     nn.Linear(config.hidden_size, n_sic3_classes),
-        # )
-        #
-        # self.head_sic4 = nn.Sequential(
-        #     nn.Linear(config.hidden_size, config.hidden_size),
-        #     nn.Tanh(),
-        #     nn.Dropout(0.3),
-        #     nn.Linear(config.hidden_size, n_sic4_classes),
-        # )
-
         # register upward mapping buffers
         # M43: [|SIC4| x |SIC3|] one-hot child->parent to sum leaf probs upward to SIC3
         # M42: [|SIC4| x |SIC2|] = A43 @ A32 to sum leaf probs upward to SIC2
@@ -103,10 +73,9 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         self.cross_entropy = nn.CrossEntropyLoss(ignore_index=-100)
         self.cross_entropy_ic = nn.CrossEntropyLoss(
             ignore_index=-100,
-            label_smoothing=0.1  # Add smoothing for IC tasks
+            label_smoothing=0.1
         )
 
-        # Only reinit if not loading pretrained weights
         if not base_model_name:
             self.init_weights()
 
@@ -144,13 +113,11 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         metrics: Dict[str, torch.Tensor] = {}
         total_loss = 0.0
 
-        # ----- MLM -----
         if mlm_labels is not None:
             mlm_loss = self.cross_entropy(mlm_logits.view(-1, mlm_logits.size(-1)), mlm_labels.view(-1))
             losses["mlm"] = mlm_loss
             total_loss += self.loss_weights["mlm"] * mlm_loss
 
-            # MLM accuracy (only on masked tokens, ignore -100)
             correct, total = mlm_accuracy(mlm_logits, mlm_labels)
             if total > 0:
                 metrics["mlm_accuracy"] = torch.tensor(correct / total)
@@ -171,7 +138,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             losses["ic2"] = ic2_loss
             total_loss += self.loss_weights["ic2"] * ic2_loss
 
-            # SIC2 accuracy
             correct, total = top1_accuracy(sic2_logits, sic2)
             if total > 0:
                 metrics["ic2_accuracy"] = torch.tensor(correct / total)
@@ -181,7 +147,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             losses["ic3"] = ic3_loss
             total_loss += self.loss_weights["ic3"] * ic3_loss
 
-            # SIC3 accuracy
             correct, total = top1_accuracy(sic3_logits, sic3)
             if total > 0:
                 metrics["ic3_accuracy"] = torch.tensor(correct / total)
@@ -191,7 +156,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
             losses["ic4"] = ic4_loss
             total_loss += self.loss_weights["ic4"] * ic4_loss
 
-            # SIC4 accuracy
             correct, total = top1_accuracy(sic4_logits, sic4)
             if total > 0:
                 metrics["ic4_accuracy"] = torch.tensor(correct / total)
@@ -210,7 +174,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         if acc_weight_sum > 0.0:
             metrics["ic_accuracy"] = torch.tensor(acc_weighted_sum / acc_weight_sum)
 
-        # ----- Upward consistency from SIC4 → SIC3 and SIC4 → SIC2 -----
         have_m43 = (sic4_logits is not None) and (sic3_logits is not None) and (self.M43.numel() > 0)
         have_m42 = (sic4_logits is not None) and (sic2_logits is not None) and (self.M42.numel() > 0)
 
@@ -223,7 +186,7 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
 
             # Mask for valid SIC4 labels
             valid_mask = (sic4 != -100)
-            if valid_mask.any():  # Only proceed if we have at least one valid example
+            if valid_mask.any():
                 parts = []
 
                 prob_4 = F.softmax(sic4_logits[valid_mask], dim=-1)  # [B, n4]
@@ -255,16 +218,11 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
         }
 
     def get_optimizer_grouped_parameters(self, learning_rate: float, weight_decay: float = 0.01):
-        """
-        Group parameters with different learning rates.
-        IC heads get lower LR to prevent overfitting on fewer examples.
-        """
         no_decay = ["bias", "LayerNorm.weight"]
 
-        ic_lr_ratio = 0.2  # IC heads get 10% of base LR
+        ic_lr_ratio = 0.2
 
         optimizer_grouped_parameters = [
-            # BERT encoder params (no decay)
             {
                 "params": [p for n, p in self.bert.named_parameters()
                            if not any(nd in n for nd in no_decay)],
@@ -277,7 +235,6 @@ class BusinessBERT2Pretrain(BertPreTrainedModel):
                 "weight_decay": 0.0,
                 "lr": learning_rate,
             },
-            # IC heads with reduced LR (no decay)
             {
                 "params": [p for n, p in self.head_sic2.named_parameters()
                            if not any(nd in n for nd in no_decay)],

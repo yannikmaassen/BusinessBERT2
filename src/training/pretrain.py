@@ -101,7 +101,6 @@ def main():
 
     data_collator = Collator(tokenizer=tokenizer)
 
-    # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
 
