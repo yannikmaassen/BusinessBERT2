@@ -7,7 +7,18 @@ from torch.optim import AdamW
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
-from src.data import Collator, PretrainDatasetOnTheFlyNewFixedEval
+from src.data import (
+    PretrainDatasetOnTheFly,
+    Collator,
+    PretrainDatasetOnTheFlyNew,
+    PretrainDatasetWithNSP,
+    PretrainDatasetWithNSPSegments,
+    PretrainDatasetWithNSPSegmentsMax,
+    PretrainDatasetWithNSPAsymmetric,
+    PretrainDatasetWithNSPAsymmetricFixedEval,
+    PretrainDatasetWithNSPOptimized,
+    PretrainDatasetWithNSPOptimizedFixedEval
+)
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
@@ -85,25 +96,8 @@ def main():
     )
 
     print("Tokenizing train/val datasets...")
-    train_dataset = PretrainDatasetOnTheFlyNewFixedEval(
-        train_rows,
-        tokenizer,
-        config["max_seq_len"],
-        taxonomy_maps["idx2"],
-        taxonomy_maps["idx3"],
-        taxonomy_maps["idx4"],
-        is_training=True
-    )
-    val_dataset = PretrainDatasetOnTheFlyNewFixedEval(
-        val_rows,
-        tokenizer,
-        config["max_seq_len"],
-        taxonomy_maps["idx2"],
-        taxonomy_maps["idx3"],
-        taxonomy_maps["idx4"],
-        is_training=False,
-        seed=config["seed"]
-    )
+    train_dataset = PretrainDatasetWithNSPAsymmetricFixedEval(train_rows, tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], is_training=True)
+    val_dataset   = PretrainDatasetWithNSPAsymmetricFixedEval(val_rows,   tokenizer, config["max_seq_len"], taxonomy_maps["idx2"], taxonomy_maps["idx3"], taxonomy_maps["idx4"], is_training=False, seed=config["seed"])
 
     data_collator = Collator(tokenizer=tokenizer)
 
