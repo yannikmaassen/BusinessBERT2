@@ -6,14 +6,6 @@ from tqdm import tqdm
 
 
 class PretrainDatasetRandomSampling(Dataset):
-    """
-    Pretraining dataset with RANDOM SAMPLING strategy.
-
-    For documents longer than max_length:
-    - Samples ONE random window of max_length tokens per document
-    - Resamples a different window each epoch for data augmentation
-    """
-
     def __init__(
         self,
         raw_examples: List[Dict[str, Any]],
@@ -30,7 +22,6 @@ class PretrainDatasetRandomSampling(Dataset):
         self.indexed_sic3_list = indexed_sic3_list
         self.indexed_sic4_list = indexed_sic4_list
 
-        # Force preprocessing on CPU
         if hasattr(self.tokenizer, 'to'):
             self.tokenizer = self.tokenizer.to(preprocess_device)
 
@@ -63,7 +54,6 @@ class PretrainDatasetRandomSampling(Dataset):
                 return_special_tokens_mask=True,
             )
 
-            # Sample ONE random window (or take all if shorter than max_length)
             if len(encoding["input_ids"]) > self.max_length:
                 examples_sampled += 1
                 max_start = len(encoding["input_ids"]) - self.max_length
@@ -82,15 +72,6 @@ class PretrainDatasetRandomSampling(Dataset):
                 "sic3": example.get("sic3"),
                 "sic4": example.get("sic4"),
             })
-
-        print(f"\n{'='*80}")
-        print(f"DEBUG: Preprocessing Statistics")
-        print(f"{'='*80}")
-        print(f"Skipped (empty sentences): {skipped_empty}")
-        print(f"Examples within max_length: {examples_within_max}")
-        print(f"Examples requiring sampling: {examples_sampled}")
-        print(f"Total processed examples: {len(processed)}")
-        print(f"{'='*80}\n")
 
         return processed
 
@@ -122,11 +103,6 @@ class PretrainDatasetRandomSampling(Dataset):
 
 
 class PretrainDatasetOnTheFly(Dataset):
-    """
-    Pretraining dataset with ON-THE-FLY SAMPLING strategy.
-
-    Instead of preprocessing, tokenizes and samples during __getitem__.
-    """
     def __init__(
         self,
         raw_examples: List[Dict[str, Any]],
@@ -163,7 +139,6 @@ class PretrainDatasetOnTheFly(Dataset):
             return_special_tokens_mask=True,
         )
 
-        # Sample random window
         if len(encoding["input_ids"]) > self.max_length:
             max_start = len(encoding["input_ids"]) - self.max_length
             start_idx = random.randint(0, max_start)

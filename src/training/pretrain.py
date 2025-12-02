@@ -7,7 +7,7 @@ from torch.optim import AdamW
 from transformers import AutoTokenizer, BertConfig, TrainingArguments
 from src.training.trainer import MultiTaskTrainer
 from src.utils.file_manager import read_jsonl
-from src.data import PretrainDatasetOnTheFly, Collator, PretrainDatasetOnTheFlyNew, PretrainDatasetOnTheFlyNewFixedEval
+from src.data import Collator, PretrainDatasetOnTheFlyNewFixedEval
 from src.models import BusinessBERT2Pretrain
 from src.utils.arg_parser import parse_cli_args
 from src.utils.taxonomy import build_taxonomy_maps
@@ -107,7 +107,6 @@ def main():
 
     data_collator = Collator(tokenizer=tokenizer)
 
-    # ---------------- Model ----------------
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     bert_config = BertConfig.from_pretrained(config["base_tokenizer"])
 

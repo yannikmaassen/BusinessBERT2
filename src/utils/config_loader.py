@@ -3,12 +3,6 @@ from typing import Dict
 
 
 def load_config(args) -> Dict:
-    """Load config from YAML (args.config) and override with CLI arguments in args.
-
-    This preserves the previous behavior: any non-None CLI argument will override
-    the corresponding value from the YAML file. For max_steps, the string
-    'none' explicitly means: do not override the YAML value.
-    """
     with open(args.config, "r") as file:
         config = yaml.safe_load(file)
 
@@ -28,7 +22,7 @@ def load_config(args) -> Dict:
         config["learning_rate"] = args.learning_rate
     if getattr(args, "num_train_epochs", None) is not None:
         config["num_train_epochs"] = args.num_train_epochs
-    # Special-case: respect 'none' sentinel for max_steps.
+    # respect 'none' sentinel for max_steps.
     if getattr(args, "max_steps", None) is not None and getattr(args, "max_steps") != "none":
         config["max_steps"] = args.max_steps
     if getattr(args, "warmup_steps", None) is not None:
