@@ -27,7 +27,7 @@ class Collator:
         base_features = [{k: v for k, v in f.items() if k not in extra_keys}
                          for f in features]
 
-        # HF handles padding + MLM masking (returns 'input_ids', 'attention_mask', 'labels')
+        # HF handles padding + MLM masking
         batch = self._mlm(base_features)
 
         # Rename to match expected output

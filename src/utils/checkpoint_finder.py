@@ -4,13 +4,6 @@ import re
 CHECKPOINT_PREFIX = "checkpoint-"
 
 def find_latest_checkpoint(output_dir: str):
-    """
-    Return path to latest checkpoint directory or None.
-    A valid checkpoint must contain:
-      - model file (pytorch_model.bin or model.safetensors)
-      - optimizer.pt
-      - trainer_state.json
-    """
     if not os.path.isdir(output_dir):
         return None
 
@@ -27,7 +20,6 @@ def find_latest_checkpoint(output_dir: str):
             continue
         step = int(m.group(1))
 
-        # Validate expected files
         has_model = (
             os.path.isfile(os.path.join(full, "pytorch_model.bin")) or
             os.path.isfile(os.path.join(full, "model.safetensors"))
