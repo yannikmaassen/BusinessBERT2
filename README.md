@@ -1,6 +1,15 @@
 # BusinessBERT2
 
 This repository contains the code used for the pretraining of BusinessBERT2. It is a domain-adapted BERT-style encoder for business communication.
+There are two feature branches that hold two architectures that can be used for replication.
+
+1. feature/v1-MLM-NSP-IC
+
+This branch contains the code for the so-called "BusinessBERT 2.0-v1" approach. It implements the MLM, NSP and IC objective.
+
+2. feature/v2-MLM-IC
+
+This branch contains the code for the so-called "BusinessBERT 2.0-v2" approach. It implements the MLM and IC objective and omits the NSP objective.
 
 ## Quick start (local)
 ```bash
